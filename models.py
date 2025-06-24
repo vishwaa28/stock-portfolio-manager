@@ -1,0 +1,26 @@
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin
+from sqlalchemy import UniqueConstraint
+
+db = SQLAlchemy()
+
+class User(db.Model, UserMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password = db.Column(db.String(100), nullable=False)
+    portfolio = db.relationship('PortfolioStock', backref='owner', lazy=True)
+    watchlist = db.relationship('WatchlistStock', backref='user', lazy=True)
+
+class PortfolioStock(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    symbol = db.Column(db.String(10), nullable=False)
+    target_up = db.Column(db.Float)
+    target_dn = db.Column(db.Float)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+class WatchlistStock(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    symbol = db.Column(db.String(10), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    __table_args__ = (UniqueConstraint('symbol', 'user_id', name='unique_watchlist'), )
+
