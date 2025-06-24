@@ -3,14 +3,8 @@ import random
 import os
 from datetime import datetime, timedelta
 
-# Real API Keys (Use env vars in production)
-MARKETSTACK_API_KEY = os.getenv("MARKETSTACK_API_KEY", "7362b480d77a0b5a3cd4b3601f7c70db")
-MEDIASTACK_API_KEY = os.getenv("MEDIASTACK_API_KEY", "158e34144f7dad49dc1dc702ed3ae7a5")
-
-#afzal api
-# MARKETSTACK_API_KEY = os.getenv("MARKETSTACK_API_KEY", "65a4255f73c3ec226176aa977375d33f")
-# MEDIASTACK_API_KEY = os.getenv("MEDIASTACK_API_KEY", "dd5c5a74cfd485b399c55fd831035be8")
-
+# Finnhub API key (get from https://finnhub.io)
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "d1d3ap9r01qic6lgtil0d1d3ap9r01qic6lgtilg")
 
 STOCK_DATA = {
     "AAPL": {"name": "Apple Inc.", "sector": "Technology"},
@@ -31,17 +25,18 @@ STOCK_DATA = {
 }
 
 def fetch_price(symbol):
-    url = f"http://api.marketstack.com/v1/eod/latest?access_key={MARKETSTACK_API_KEY}&symbols={symbol}"
+    url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={FINNHUB_API_KEY}"
     try:
         response = requests.get(url)
         data = response.json()
-        if "data" in data and data["data"]:
-            return round(data["data"][0]["close"], 2)
+        price = data.get("c")  # current price
+        if price:
+            return round(price, 2)
         else:
-            print(f"No data for {symbol}")
+            print(f"No Finnhub price data for {symbol}")
             return round(STOCK_DATA.get(symbol, {}).get("base_price", random.uniform(10, 500)), 2)
     except Exception as e:
-        print(f"Marketstack error: {e}")
+        print(f"Finnhub price error: {e}")
         return round(STOCK_DATA.get(symbol, {}).get("base_price", random.uniform(10, 500)), 2)
 
 def analyze_sentiment(text):
@@ -59,46 +54,43 @@ def analyze_sentiment(text):
 def fetch_news(symbol, limit=5):
     if symbol not in STOCK_DATA:
         return []
-    company_name = STOCK_DATA[symbol]["name"]
-    url = f"http://api.mediastack.com/v1/news?access_key={MEDIASTACK_API_KEY}&keywords={company_name}&limit={limit}&languages=en"
+    url = f"https://finnhub.io/api/v1/company-news?symbol={symbol}&from={(datetime.now() - timedelta(days=7)).date()}&to={datetime.now().date()}&token={FINNHUB_API_KEY}"
     try:
         response = requests.get(url)
         data = response.json()
         news_items = []
-        if "data" in data:
-            for item in data["data"]:
-                sentiment = analyze_sentiment(item.get("title", "") + " " + item.get("description", ""))
-                news_items.append({
-                    "title": item.get("title"),
-                    "description": item.get("description"),
-                    "url": item.get("url"),
-                    "source": item.get("source"),
-                    "published": item.get("published_at"),
-                    "sentiment": sentiment
-                })
+        for item in data[:limit]:
+            sentiment = analyze_sentiment(item.get("headline", "") + " " + item.get("summary", ""))
+            news_items.append({
+                "title": item.get("headline"),
+                "description": item.get("summary"),
+                "url": item.get("url"),
+                "source": item.get("source"),
+                "published": datetime.fromtimestamp(item.get("datetime")).strftime('%Y-%m-%d'),
+                "sentiment": sentiment
+            })
         return news_items
     except Exception as e:
-        print(f"Mediastack error: {e}")
+        print(f"Finnhub news error: {e}")
         return []
 
 def fetch_general_news(limit=10):
-    url = f"http://api.mediastack.com/v1/news?access_key={MEDIASTACK_API_KEY}&categories=business,technology&limit={limit}&languages=en"
+    url = f"https://finnhub.io/api/v1/news?category=general&token={FINNHUB_API_KEY}"
     try:
         response = requests.get(url)
         data = response.json()
         news_items = []
-        if "data" in data:
-            for item in data["data"]:
-                news_items.append({
-                    "title": item.get("title"),
-                    "description": item.get("description"),
-                    "source": item.get("source"),
-                    "url": item.get("url"),
-                    "published": item.get("published_at")
-                })
+        for item in data[:limit]:
+            news_items.append({
+                "title": item.get("headline"),
+                "description": item.get("summary"),
+                "source": item.get("source"),
+                "url": item.get("url"),
+                "published": datetime.fromtimestamp(item.get("datetime")).strftime('%Y-%m-%d')
+            })
         return news_items
     except Exception as e:
-        print(f"Mediastack general news error: {e}")
+        print(f"Finnhub general news error: {e}")
         return []
 
 def fetch_all_stocks():
