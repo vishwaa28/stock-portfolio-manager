@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Portfolio Manager{% endblock %}
+
+{% block body %}
+<div class="fade-in-up">
+    <!-- Dashboard Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="display-6 mb-0">
+                        <i class="fas fa-tachometer-alt text-primary"></i>
+                        Portfolio Dashboard
+                    </h1>
+                    <p class="text-muted">Monitor your investments and market alerts</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('add_stock') }}" class="btn btn-primary me-2">
+                        <i class="fas fa-plus"></i> Add Stock
+                    </a>
+                    <button class="btn btn-outline-primary" onclick="refreshDashboard()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Portfolio Summary -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="dashboard-stat">
+                <div class="stat-value">${{ "%.2f"|format(total_value) }}</div>
+                <div class="stat-label">Total Portfolio Value</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dashboard-stat">
+                <div class="stat-value">{{ table|length }}</div>
+                <div class="stat-label">Stocks Tracked</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dashboard-stat">
+                <div class="stat-value sentiment-positive">
+                    {{ table|selectattr("sentiment_class", "equalto", "positive")|list|length }}
+                </div>
+                <div class="stat-label">Positive Sentiment</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dashboard-stat">
+                <div class="stat-value sentiment-negative">
+                    {{ (table|selectattr("alerts")|list|length) }}
+                </div>
+                <div class="stat-label">Active Alerts</div>
+            </div>
+        </div>
+    </div>
+
+    {% if table %}
+        <!-- Grid Layout -->
+        <div class="row g-4">
+            {% for row in table %}
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ row.symbol }}</h5>
+                        <p class="card-text"><strong>Price:</strong> ${{ "%.2f"|format(row.price) }}</p>
+                        <p class="card-text"><strong>Sentiment:</strong> <span class="sentiment-{{ row.sentiment_class }}">{{ row.sentiment_text }}</span></p>
+
+                        <div class="mb-2">
+                            <strong>Targets:</strong><br>
+                            <button class="btn btn-sm btn-outline-success mb-1" onclick="setTarget('{{ row.symbol }}', 'up', '{{ row.price }}')">
+                                <i class="fas fa-arrow-up"></i> {% if row.target_up %}${{ "%.2f"|format(row.target_up) }}{% else %}Set{% endif %}
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger mb-1" onclick="setTarget('{{ row.symbol }}', 'down', '{{ row.price }}')">
+                                <i class="fas fa-arrow-down"></i> {% if row.target_dn %}${{ "%.2f"|format(row.target_dn) }}{% else %}Set{% endif %}
+                            </button>
+                        </div>
+
+                        <div class="mb-2">
+                            <strong>News:</strong>
+                            <ul class="list-unstyled">
+                                {% for article in row.news[:2] %}
+                                <li>
+                                    <a href="{{ article.url }}" target="_blank" class="text-decoration-none">
+                                        <small><strong>{{ article.title[:40] }}...</strong></small>
+                                    </a><br>
+                                    <small class="text-muted">{{ article.source }} - {{ article.published[:10] }}</small>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% if row.news|length > 2 %}<small class="text-muted">+{{ row.news|length - 2 }} more</small>{% endif %}
+                        </div>
+
+                        <div class="mb-2">
+                            <strong>Alerts:</strong><br>
+                            {% if row.alerts %}
+                                {% for alert in row.alerts[:2] %}
+                                    <div class="alert alert-warning alert-sm py-1 px-2 mb-1">
+                                        <small>{{ alert[:50] }}...</small>
+                                    </div>
+                                {% endfor %}
+                                {% if row.alerts|length > 2 %}<small class="text-muted">+{{ row.alerts|length - 2 }} more</small>{% endif %}
+                            {% else %}
+                                <span class="text-muted">No alerts</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="card-footer d-flex justify-content-between">
+                        <button class="btn btn-sm btn-outline-info" onclick="viewDetails('{{ row.symbol }}')">
+                            <i class="fas fa-info-circle"></i>
+                        </button>
+                        <form method="POST" action="{{ url_for('remove_from_portfolio', symbol=row.symbol) }}" onsubmit="return confirm('Remove {{ row.symbol }} from portfolio?')">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Sell</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <!-- Empty State -->
+        <div class="text-center py-5">
+            <div class="card">
+                <div class="card-body py-5">
+                    <i class="fas fa-chart-line fa-4x text-muted mb-3"></i>
+                    <h3 class="text-muted">Your portfolio is empty</h3>
+                    <p class="text-muted mb-4">Start by adding some stocks to track your investments</p>
+                    <a href="{{ url_for('add_stock') }}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-plus"></i> Add Your First Stock
+                    </a>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+.alert-sm { font-size: 0.75rem; }
+.news-item { border-left: 3px solid #667eea; padding-left: 8px; }
+.alerts-container .alert { border-radius: 8px; }
+.dashboard-stat { position: relative; overflow: hidden; }
+.dashboard-stat::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 3px; background: var(--primary-gradient); transition: left 0.3s ease; }
+.dashboard-stat:hover::before { left: 0; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function setTarget(symbol, direction, currentPrice) {
+    document.getElementById('targetSymbol').value = symbol;
+    document.getElementById('currentPrice').value = '$' + currentPrice;
+    document.getElementById('targetLabel').textContent = direction === 'up' ? 'Upper Target Price' : 'Lower Target Price';
+
+    const form = document.getElementById('targetForm');
+    form.action = `/set_targets/${symbol}`;
+
+    const targetInput = document.getElementById('targetPrice');
+    targetInput.name = direction === 'up' ? 'target_up' : 'target_dn';
+    targetInput.placeholder = direction === 'up' ? 'Price to alert when reached' : 'Price to alert when dropped below';
+
+    new bootstrap.Modal(document.getElementById('targetModal')).show();
+}
+
+function viewDetails(symbol) {
+    const detailsContent = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Stock Information</h6>
+                <p><strong>Symbol:</strong> ${symbol}</p>
+                <p><strong>Exchange:</strong> NASDAQ</p>
+                <p><strong>Sector:</strong> Technology</p>
+            </div>
+            <div class="col-md-6">
+                <h6>Performance</h6>
+                <p><strong>52 Week High:</strong> $${(Math.random() * 100 + 200).toFixed(2)}</p>
+                <p><strong>52 Week Low:</strong> $${(Math.random() * 50 + 100).toFixed(2)}</p>
+                <p><strong>Volume:</strong> ${Math.floor(Math.random() * 1000000).toLocaleString()}</p>
+            </div>
+        </div>
+        <hr>
+        <h6>Recent News</h6>
+        <div class="news-list">
+            <div class="news-item mb-2 p-2 bg-light rounded">
+                <strong>${symbol} Reports Strong Quarterly Results</strong>
+                <br><small class="text-muted">2 hours ago - MarketWatch</small>
+            </div>
+            <div class="news-item mb-2 p-2 bg-light rounded">
+                <strong>Analysts Upgrade ${symbol} Price Target</strong>
+                <br><small class="text-muted">1 day ago - Bloomberg</small>
+            </div>
+        </div>
+    `;
+    document.getElementById('stockDetails').innerHTML = detailsContent;
+    new bootstrap.Modal(document.getElementById('detailsModal')).show();
+}
+
+function refreshDashboard() {
+    location.reload();
+}
+
+setInterval(function() {
+    console.log('Auto-refreshing dashboard...');
+}, 120000);
+</script>
+{% endblock %}

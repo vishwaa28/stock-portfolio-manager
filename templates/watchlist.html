@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block body %}
+<style>
+  .search-box {
+    max-width: 500px;
+    margin-bottom: 30px;
+  }
+  .card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid #ddd;
+  }
+  .card:hover {
+    transform: scale(1.02);
+    box-shadow: 0 0 15px rgba(0,0,0,0.15);
+  }
+  .stock-symbol {
+    font-weight: bold;
+    font-size: 1.3rem;
+    color: #0d6efd;
+  }
+  .stock-price {
+    font-size: 1.1rem;
+    color: green;
+    font-weight: 600;
+  }
+  .btn-buy {
+    margin-top: 10px;
+  }
+</style>
+
+<div class="container my-5">
+  <h2 class="text-center mb-4">Your Watchlist</h2>
+
+  <!-- Watchlist Stocks -->
+  <div class="row" id="watchlistCards">
+    {% if watchlist %}
+      {% for stock in watchlist %}
+      <div class="col-md-4 mb-4">
+        <div class="card h-100">
+          <div class="card-body text-center">
+            <div class="stock-symbol">{{ stock.symbol }}</div>
+            <div class="stock-price">${{ stock.price }}</div>
+            <form action="{{ url_for('add_stock') }}" method="POST" class="btn-buy">
+
+              <input type="hidden" name="symbol" value="{{ stock.symbol }}">
+              <button type="submit" class="btn btn-sm btn-success">💰 Buy</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="text-center text-muted">No stocks in your watchlist yet.</p>
+    {% endif %}
+  </div>
+
+  <hr class="my-5">
+  <h3 class="text-center mb-4">📰 Related News</h3>
+  <div class="row">
+    {% for news in related_news %}
+    <div class="col-md-6 mb-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">{{ news.title }}</h5>
+          <p class="card-text"><small class="text-muted">{{ news.source }} • {{ news.published }}</small></p>
+          <a href="{{ news.url }}" target="_blank" class="btn btn-sm btn-outline-primary">Read More</a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}Home - Portfolio Manager{% endblock %}
+
+{% block body %}
+<!-- Hero Section -->
+<div class="hero-section py-5 mb-5" style="background: var(--primary-gradient); border-radius: var(--border-radius); color: white;">
+    <div class="container text-center">
+        <h1 class="display-4 mb-3">
+            <i class="fas fa-chart-trending-up"></i>
+            Welcome to Portfolio Manager
+        </h1>
+        <p class="lead mb-4">Track stocks, analyze sentiment, and manage your investments with ease</p>
+        {% if not current_user.is_authenticated %}
+            <a href="{{ url_for('login') }}" class="btn btn-light btn-lg">
+                <i class="fas fa-sign-in-alt"></i> Get Started
+            </a>
+        {% else %}
+            <a href="{{ url_for('dashboard') }}" class="btn btn-light btn-lg">
+                <i class="fas fa-tachometer-alt"></i> Go to Dashboard
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Market Overview -->
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-globe-americas"></i> Market Overview
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 text-center">
+                        <div class="market-stat">
+                            <div class="stat-value text-success">{{ stocks|length }}</div>
+                            <div class="stat-label">Stocks Available</div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-3 text-center">
+                        <div class="market-stat">
+                            <div class="stat-value text-info">{{ news_list|length }}</div>
+                            <div class="stat-label">News Articles</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <div class="market-stat">
+                            <div class="stat-value text-warning">
+                                <i class="fas fa-circle text-success"></i> OPEN
+                            </div>
+                            <div class="stat-label">Market Status</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stock Explorer -->
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-search"></i> Explore Stocks
+                </h5>
+                <div class="d-flex gap-2">
+                    <select class="form-select form-select-sm" id="sectorFilter">
+                        <option value="">All Sectors</option>
+                        <option value="Technology">Technology</option>
+                        <option value="Financial Services">Financial Services</option>
+                        <option value="Consumer Discretionary">Consumer Discretionary</option>
+                        <option value="Automotive">Automotive</option>
+                        <option value="Communication Services">Communication Services</option>
+                    </select>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Search Bar -->
+                <div class="row mb-4">
+                    <div class="col-md-8 mx-auto">
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input type="text" class="form-control" id="stockSearch"
+                                   placeholder="Search stocks by symbol or company name (e.g. AAPL, Apple)">
+                            <button class="btn btn-outline-secondary" type="button" onclick="clearSearch()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stock Grid -->
+                <div class="row" id="stockGrid">
+                    {% for stock in stocks %}
+                    <div class="col-lg-3 col-md-4 col-sm-6 mb-4 stock-card" data-sector="{{ stock.sector }}">
+                        <div class="card stock-item h-100">
+                            <div class="card-body text-center">
+                                <div class="stock-header mb-3">
+                                    <div class="stock-symbol">{{ stock.symbol }}</div>
+                                    <div class="stock-name text-muted">{{ stock.name }}</div>
+                                    <div class="stock-sector">
+                                        <span class="badge bg-secondary">{{ stock.sector }}</span>
+                                    </div>
+                                </div>
+
+                                <div class="stock-price-container mb-3">
+                                    <div class="stock-price" data-symbol="{{ stock.symbol }}">
+                                        ${{ "%.2f"|format(stock.price) }}
+                                    </div>
+                                    <div class="price-change">
+                                        {% set change = (stock.price * (range(-5, 6)|random / 100)) %}
+                                        <span class="{{ 'price-up' if change > 0 else 'price-down' }}">
+                                            {{ '+' if change > 0 else '' }}{{ "%.2f"|format(change) }}
+                                            ({{ '+' if change > 0 else '' }}{{ "%.1f"|format((change/stock.price)*100) }}%)
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {% if current_user.is_authenticated %}
+                                    <div class="stock-actions">
+                                        <form action="{{ url_for('add_to_watchlist') }}" method="POST" class="d-inline">
+                                            <input type="hidden" name="symbol" value="{{ stock.symbol }}">
+                                            <button type="submit" class="btn btn-primary btn-sm">
+                                                <i class="fas fa-eye"></i> Watch
+                                            </button>
+                                        </form>
+                                        <button type="button" class="btn btn-outline-info btn-sm ms-1"
+                                                onclick="quickView('{{ stock.symbol }}', '{{ stock.name }}', '{{ stock.price }}')">
+                                            <i class="fas fa-info-circle"></i>
+                                        </button>
+                                    </div>
+                                {% else %}
+                                    <div class="stock-actions">
+                                        <a href="{{ url_for('login') }}" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-sign-in-alt"></i> Login to Track
+                                        </a>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- No Results Message -->
+                <div id="noResults" class="text-center py-5" style="display: none;">
+                    <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                    <h4 class="text-muted">No stocks found</h4>
+                    <p class="text-muted">Try adjusting your search criteria</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Market News -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-newspaper"></i> Latest Market News
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- News Search -->
+                <div class="row mb-4">
+                    <div class="col-md-6 mx-auto">
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input type="text" class="form-control" id="newsSearch"
+                                   placeholder="Search news articles...">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- News Grid -->
+                <div class="row" id="newsGrid">
+                    {% for news in news_list %}
+                    <div class="col-md-6 col-lg-4 mb-4 news-card">
+                        <div class="card news-item h-100">
+                            <div class="card-body">
+                                <h6 class="card-title">{{ news.title }}</h6>
+                                <p class="card-text">
+                                    <small class="text-muted">
+                                        <i class="fas fa-building"></i> {{ news.source }} •
+                                        <i class="fas fa-clock"></i> {{ news.published }}
+                                    </small>
+                                </p>
+                                <p class="card-text">{{ news.description[:100] }}...</p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <a href="{{ news.url }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-external-link-alt"></i> Read More
+                                    </a>
+                                    <small class="text-muted">
+                                        <i class="fas fa-eye"></i> {{ range(100, 1000)|random }} views
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
