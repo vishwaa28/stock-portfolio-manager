@@ -9,19 +9,9 @@ FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "d1d3ap9r01qic6lgtil0d1d3ap9r01qi
 STOCK_DATA = {
     "AAPL": {"name": "Apple Inc.", "sector": "Technology"},
     "GOOGL": {"name": "Alphabet Inc.", "sector": "Technology"},
-    "AMZN": {"name": "Amazon.com Inc.", "base_price": 145.80, "sector": "Consumer Discretionary"},
-    "TSLA": {"name": "Tesla Inc.", "base_price": 248.50, "sector": "Automotive"},
-    "MSFT": {"name": "Microsoft Corp.", "base_price": 378.85, "sector": "Technology"},
-    "NVDA": {"name": "NVIDIA Corp.", "base_price": 465.20, "sector": "Technology"},
-    "META": {"name": "Meta Platforms Inc.", "base_price": 296.70, "sector": "Technology"},
-    "NFLX": {"name": "Netflix Inc.", "base_price": 421.15, "sector": "Communication Services"},
-    "AMD": {"name": "Advanced Micro Devices", "base_price": 112.30, "sector": "Technology"},
-    "INTC": {"name": "Intel Corp.", "base_price": 43.85, "sector": "Technology"},
-    "CRM": {"name": "Salesforce Inc.", "base_price": 214.60, "sector": "Technology"},
-    "ORCL": {"name": "Oracle Corp.", "base_price": 118.45, "sector": "Technology"},
-    "IBM": {"name": "IBM Corp.", "base_price": 165.80, "sector": "Technology"},
-    "V": {"name": "Visa Inc.", "base_price": 245.30, "sector": "Financial Services"},
-    "MA": {"name": "Mastercard Inc.", "base_price": 398.90, "sector": "Financial Services"},
+    "AMZN": {"name": "Amazon.com Inc.", "sector": "Consumer Discretionary"},
+    "TSLA": {"name": "Tesla Inc.", "sector": "Automotive"},
+
 }
 
 def fetch_price(symbol):

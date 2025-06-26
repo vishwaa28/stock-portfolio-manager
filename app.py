@@ -69,7 +69,7 @@ def create_app():
                 flash(f"{symbol} is already in your portfolio.", "warning")
         return render_template("add_stock.html")
 
-    @app.route("/watchlist")
+    @app.route("/portfolio")
     @login_required
     def watchlist():
         stocks = WatchlistStock.query.filter_by(user_id=current_user.id).all()
@@ -85,7 +85,7 @@ def create_app():
                 "news": news
             })
             related_news.extend(news[:2])
-        return render_template("watchlist.html", watchlist=data, related_news=related_news)
+        return render_template("portfolio.html", watchlist=data, related_news=related_news)
 
     @app.route("/buy_stock/<symbol>", methods=["POST"])
     @login_required
