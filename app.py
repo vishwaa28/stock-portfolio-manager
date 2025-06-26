@@ -3,7 +3,7 @@ from flask_login import LoginManager, login_user, login_required, current_user, 
 from apscheduler.schedulers.background import BackgroundScheduler
 from config import Config
 from models import db, User, PortfolioStock, WatchlistStock
-from api_clients import fetch_price, fetch_news, fetch_all_stocks, fetch_general_news
+from api_clients import fetch_price, fetch_news, fetch_all_stocks, fetch_general_news, fetch_detailed_stocks, fetch_sector_news
 from sentiment import analyze_sentiment
 import random
 from datetime import datetime, timedelta
@@ -28,7 +28,6 @@ def create_app():
             db.session.add(user)
             db.session.commit()
 
-
     # Login manager setup
     login_manager = LoginManager(app)
     login_manager.login_view = "login"
@@ -40,88 +39,35 @@ def create_app():
     @app.route("/")
     def home():
         stocks = fetch_all_stocks()
-        news_list = fetch_general_news()
-        return render_template("home.html", stocks=stocks, news_list=news_list)
-
-    @app.route("/add_to_watchlist", methods=["POST"])
-    # @login_required
-    def add_to_watchlist():
-        symbol = request.form["symbol"].upper()
-        if not WatchlistStock.query.filter_by(symbol=symbol, user_id=current_user.id).first():
-            db.session.add(WatchlistStock(symbol=symbol, user_id=current_user.id))
-            db.session.commit()
-            flash(f"{symbol} added to your watchlist!", "success")
-        else:
-            flash(f"{symbol} is already in your watchlist.", "warning")
-        return redirect(url_for("watchlist"))
-
-    @app.route("/add_stock", methods=["GET", "POST"])
-    @login_required
-    def add_stock():
-        if request.method == "POST":
-            symbol = request.form["symbol"].upper()
-            if not PortfolioStock.query.filter_by(symbol=symbol, user_id=current_user.id).first():
-                db.session.add(PortfolioStock(symbol=symbol, user_id=current_user.id))
-                db.session.commit()
-                flash(f"{symbol} added to your portfolio!", "success")
-                return redirect(url_for("dashboard"))
-            else:
-                flash(f"{symbol} is already in your portfolio.", "warning")
-        return render_template("add_stock.html")
-
-    @app.route("/portfolio")
-    @login_required
-    def watchlist():
-        stocks = WatchlistStock.query.filter_by(user_id=current_user.id).all()
-        data = []
-        related_news = []
-
-        for stock in stocks:
-            price = fetch_price(stock.symbol)
-            news = fetch_news(stock.symbol, limit=3)
-            data.append({
-                "symbol": stock.symbol,
-                "price": price,
-                "news": news
-            })
-            related_news.extend(news[:2])
-        return render_template("portfolio.html", watchlist=data, related_news=related_news)
-
-    @app.route("/buy_stock/<symbol>", methods=["POST"])
-    @login_required
-    def buy_stock(symbol):
-        symbol = symbol.upper()
-        # Remove from watchlist
-        WatchlistStock.query.filter_by(symbol=symbol, user_id=current_user.id).delete()
-
-        # Add to portfolio if not already there
-        if not PortfolioStock.query.filter_by(symbol=symbol, user_id=current_user.id).first():
-            db.session.add(PortfolioStock(symbol=symbol, user_id=current_user.id))
-            flash(f"{symbol} bought and added to your portfolio!", "success")
-        else:
-            flash(f"{symbol} is already in your portfolio.", "warning")
-
-        db.session.commit()
-        return redirect(url_for("watchlist"))
-
-    @app.route("/remove_from_watchlist/<symbol>", methods=["POST"])
-    @login_required
-    def remove_from_watchlist(symbol):
-        WatchlistStock.query.filter_by(symbol=symbol, user_id=current_user.id).delete()
-        db.session.commit()
-        flash(f"{symbol} removed from watchlist.", "info")
-        return redirect(url_for("watchlist"))
-
-    @app.route("/remove_from_portfolio/<symbol>", methods=["POST"])
-    @login_required
-    def remove_from_portfolio(symbol):
-        deleted = PortfolioStock.query.filter_by(symbol=symbol, user_id=current_user.id).delete()
-        if deleted == 0:
-            flash("No such stock found in your portfolio.", "warning")
-        else:
-            flash(f"{symbol} removed from portfolio.", "info")
-        db.session.commit()
-        return redirect(url_for("dashboard"))
+        ticker_data = fetch_detailed_stocks(limit=10)
+        # Gather unique sectors from top 10 stocks
+        unique_sectors = set([s['sector'] for s in ticker_data if s.get('sector') and s['sector'] != 'Unknown'])
+        news_list = []
+        recent_days = 3
+        now = datetime.now()
+        for sector in unique_sectors:
+            sector_news = fetch_sector_news(sector, limit=10)
+            # Only include news from the last 3 days
+            recent_news = []
+            for news in sector_news:
+                try:
+                    published_date = datetime.strptime(news['published'], '%Y-%m-%d')
+                    if (now - published_date).days <= recent_days:
+                        news['sector'] = sector
+                        recent_news.append(news)
+                except Exception:
+                    continue
+            # Sort by published date descending
+            recent_news.sort(key=lambda n: n['published'], reverse=True)
+            news_list.extend(recent_news[:3])
+        # Fallback to general news if no sector news found
+        if not news_list:
+            news_list = fetch_general_news()
+            for news in news_list:
+                news['sector'] = 'general'
+        # Sort all news by published date descending
+        news_list.sort(key=lambda n: n['published'], reverse=True)
+        return render_template("home.html", stocks=stocks, news_list=news_list, ticker_data=ticker_data)
 
     @app.route("/dashboard")
     @login_required
@@ -187,7 +133,6 @@ def create_app():
         else:
             final_msg = "📉 Your stocks are showing overall **negative sentiment**. Consider reviewing your portfolio to prevent potential loss."
 
-        # Send the email
         try:
             msg = Message("📊 Stock Sentiment Analysis", recipients=[user_email])
             msg.body = final_msg
@@ -197,23 +142,26 @@ def create_app():
 
         return render_template("dashboard.html", table=table, total_value=total_value)
 
-    @app.route("/set_targets/<symbol>", methods=["POST"])
-    @login_required
-    def set_targets(symbol):
-        stock = PortfolioStock.query.filter_by(symbol=symbol, user_id=current_user.id).first()
-        if stock:
-            target_up = request.form.get("target_up")
-            target_dn = request.form.get("target_dn")
-
-            stock.target_up = float(target_up) if target_up else None
-            stock.target_dn = float(target_dn) if target_dn else None
-            db.session.commit()
-            flash(f"Price targets updated for {symbol}!", "success")
-        return redirect(url_for("dashboard"))
 
     @app.route("/api/price/<symbol>")
     def api_price(symbol):
         return jsonify({"price": fetch_price(symbol)})
+
+    @app.route("/api/top_stocks")
+    def api_top_stocks():
+        stocks = fetch_detailed_stocks(limit=10)
+        return jsonify([
+            {
+                "symbol": s["symbol"],
+                "name": s["name"],
+                "price": s["price"],
+                "change": s["change"],
+                "percent": s["percent"],
+                "volume": s["volume"],
+                "sector": s["sector"],
+                "market_cap": s["market_cap"]
+            } for s in stocks
+        ])
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
@@ -225,10 +173,6 @@ def create_app():
             flash("Invalid credentials", "danger")
         return render_template("login.html")
 
-    @app.route("/register", methods=["GET", "POST"])
-    def register():
-        return render_template("register.html")
-
 
     @app.route("/logout")
     def logout():
@@ -238,12 +182,6 @@ def create_app():
     def monitor_portfolio():
         with app.app_context():
             for stock in PortfolioStock.query.all():
-                price = fetch_price(stock.symbol)
-                if stock.target_up and price >= stock.target_up:
-                    print(f"[ALERT] {stock.symbol} reached target: ${price}")
-                if stock.target_dn and price <= stock.target_dn:
-                    print(f"[ALERT] {stock.symbol} dropped to: ${price}")
-
                 for article in fetch_news(stock.symbol, limit=3):
                     sentiment = analyze_sentiment(article["title"] + " " + article.get("description", ""))
                     if sentiment == "negative":
@@ -252,6 +190,37 @@ def create_app():
     scheduler = BackgroundScheduler()
     scheduler.add_job(monitor_portfolio, "interval", minutes=5)
     scheduler.start()
+
+    @app.route("/api/stock_history/<symbol>")
+    def api_stock_history(symbol):
+        # Try to fetch from Finnhub, fallback to mock data
+        import requests
+        from datetime import datetime, timedelta
+        FINNHUB_API_KEY = app.config.get('FINNHUB_API_KEY', 'd1d3ap9r01qic6lgtil0d1d3ap9r01qic6lgtilg')
+        try:
+            end = datetime.now()
+            start = end - timedelta(days=30)
+            url = f"https://finnhub.io/api/v1/stock/candle?symbol={symbol}&resolution=D&from={int(start.timestamp())}&to={int(end.timestamp())}&token={FINNHUB_API_KEY}"
+            resp = requests.get(url)
+            data = resp.json()
+            if data.get('s') == 'ok':
+                result = []
+                for i in range(len(data['t'])):
+                    date = datetime.fromtimestamp(data['t'][i]).strftime('%Y-%m-%d')
+                    price = data['c'][i]
+                    result.append({"date": date, "price": price})
+                return jsonify(result)
+        except Exception as e:
+            print(f"Finnhub history error: {e}")
+        # Fallback: generate mock data
+        today = datetime.now()
+        result = []
+        price = 100
+        for i in range(30, 0, -1):
+            date = (today - timedelta(days=i)).strftime('%Y-%m-%d')
+            price += random.uniform(-2, 2)
+            result.append({"date": date, "price": round(price, 2)})
+        return jsonify(result)
 
     return app
 
