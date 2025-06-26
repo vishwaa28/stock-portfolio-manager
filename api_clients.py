@@ -117,3 +117,59 @@ def get_market_summary():
         "stocks_down": down_count,
         "market_sentiment": "positive" if up_count > down_count else "negative"
     }
+
+def fetch_all_symbols(exchange="US"):
+    url = f"https://finnhub.io/api/v1/stock/symbol?exchange={exchange}&token={FINNHUB_API_KEY}"
+    try:
+        response = requests.get(url)
+        data = response.json()
+        return data  # list of dicts with 'symbol', 'description', etc.
+    except Exception as e:
+        print(f"Error fetching symbols: {e}")
+        return []
+
+def fetch_company_profile(symbol):
+    url = f"https://finnhub.io/api/v1/stock/profile2?symbol={symbol}&token={FINNHUB_API_KEY}"
+    try:
+        response = requests.get(url)
+        return response.json()
+    except Exception as e:
+        print(f"Error fetching company profile for {symbol}: {e}")
+        return {}
+
+def fetch_detailed_stocks(limit=20):
+    stocks = []
+    symbols = fetch_all_symbols()
+    for item in symbols[:limit]:  # Limit for demo/testing
+        symbol = item["symbol"]
+        profile = fetch_company_profile(symbol)
+        price = fetch_price(symbol)
+        if profile:
+            stocks.append({
+                "symbol": symbol,
+                "name": profile.get("name", "Unknown"),
+                "sector": profile.get("finnhubIndustry", "Unknown"),
+                "price": price
+            })
+    return stocks
+
+
+def fetch_sector_news(sector_name, limit=5):
+    all_symbols = fetch_all_symbols()
+    sector_symbols = []
+
+    for item in all_symbols:
+        symbol = item["symbol"]
+        profile = fetch_company_profile(symbol)
+        if profile.get("finnhubIndustry", "").lower() == sector_name.lower():
+            sector_symbols.append(symbol)
+
+    # Get news from up to 5 companies in the sector
+    sector_news = []
+    for symbol in sector_symbols[:5]:
+        news = fetch_news(symbol, limit=limit)
+        sector_news.extend(news)
+    return sector_news
+
+
+
