@@ -83,6 +83,66 @@
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
+       .ticker-container {
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    overflow: hidden;
+    padding: 8px 0;
+    margin-bottom: 20px;
+    border: 1px solid #e0e0e0;
+    position: relative;
+}
+
+/* Scroll track */
+.ticker-track {
+    display: flex;
+    width: max-content;
+    animation: ticker-scroll 30s linear infinite;
+}
+
+/* Each item */
+.ticker-item {
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    white-space: nowrap;
+    gap: 6px;
+}
+
+/* Symbol and price colors */
+.ticker-item .symbol {
+    font-weight: 600;
+    margin-right: 4px;
+}
+
+.ticker-item.up .price {
+    color: #28a745; /* Green */
+}
+
+.ticker-item.down .price {
+    color: #dc3545; /* Red */
+}
+
+.ticker-item.neutral .price {
+    color: #6c757d; /* Gray */
+}
+
+/* Continuous scrolling animation */
+@keyframes ticker-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .ticker-item {
+        padding: 0 8px;
+        font-size: 0.85rem;
+    }
+}
 
         /* Cards */
         .card {
@@ -413,12 +473,7 @@
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('dashboard') }}">
-                                <i class="fas fa-tachometer-alt"></i> Dashboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('watchlist') }}">
-                                <i class="fas fa-eye"></i> Watchlist
+                                <i class="fas fa-tachometer-alt"></i> My Portfolio
                             </a>
                         </li>
                     {% endif %}
@@ -435,9 +490,6 @@
                     {% else %}
                         <a class="btn btn-outline-light" href="{{ url_for('login') }}">
                             <i class="fas fa-sign-in-alt"></i> Login
-                        </a>
-                    <a class="btn btn-outline-dark" href="{{ url_for('register') }}">
-                            <i class="fas fa-sign-in-alt"></i> Register
                         </a>
                     {% endif %}
                 </div>
@@ -461,7 +513,7 @@
     {% endwith %}
 
     <!-- Main Content -->
-    <main class="container my-4">
+    <main class="container-fluid px-1 my-4">
         {% block body %}{% endblock %}
     </main>
 

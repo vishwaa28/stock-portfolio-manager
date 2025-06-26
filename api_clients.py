@@ -136,23 +136,52 @@ def fetch_company_profile(symbol):
     except Exception as e:
         print(f"Error fetching company profile for {symbol}: {e}")
         return {}
+def fetch_previous_close(symbol):
+    url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={FINNHUB_API_KEY}"
+    try:
+        response = requests.get(url)
+        data = response.json()
+        return data.get("pc")  # previous close
+    except:
+        return None
 
-def fetch_detailed_stocks(limit=20):
+
+def fetch_detailed_stocks(limit=10):
     stocks = []
     symbols = fetch_all_symbols()
     for item in symbols[:limit]:  # Limit for demo/testing
         symbol = item["symbol"]
         profile = fetch_company_profile(symbol)
-        price = fetch_price(symbol)
-        if profile:
+        # Fetch quote data for price, previous close, and volume
+        url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={FINNHUB_API_KEY}"
+        try:
+            response = requests.get(url)
+            data = response.json()
+            price = data.get("c")
+            previous_close = data.get("pc")
+            volume = data.get("v")
+            percent = 0
+            change = 0
+            if price is not None and previous_close:
+                change = price - previous_close
+                percent = ((price - previous_close) / previous_close) * 100 if previous_close else 0
+            sector = profile.get("finnhubIndustry", "Unknown") if profile else "Unknown"
+            market_cap = profile.get("marketCapitalization", "N/A") if profile else "N/A"
             stocks.append({
                 "symbol": symbol,
-                "name": profile.get("name", "Unknown"),
-                "sector": profile.get("finnhubIndustry", "Unknown"),
+                "name": profile.get("name", "Unknown") if profile else "Unknown",
+                "change": change,
+                "percent": percent,
+                "volume": volume,
+                "sector": sector,
+                "market_cap": market_cap,
                 "price": price
             })
+        except Exception as e:
+            print(f"Error fetching detailed stock data for {symbol}: {e}")
+    # Sort by profit (change) descending
+    stocks.sort(key=lambda x: x["change"], reverse=True)
     return stocks
-
 
 def fetch_sector_news(sector_name, limit=5):
     all_symbols = fetch_all_symbols()
