@@ -40,33 +40,9 @@ def create_app():
     def home():
         stocks = fetch_all_stocks()
         ticker_data = fetch_detailed_stocks(limit=10)
-        # Gather unique sectors from top 10 stocks
-        unique_sectors = set([s['sector'] for s in ticker_data if s.get('sector') and s['sector'] != 'Unknown'])
-        news_list = []
-        recent_days = 3
-        now = datetime.now()
-        for sector in unique_sectors:
-            sector_news = fetch_sector_news(sector, limit=10)
-            # Only include news from the last 3 days
-            recent_news = []
-            for news in sector_news:
-                try:
-                    published_date = datetime.strptime(news['published'], '%Y-%m-%d')
-                    if (now - published_date).days <= recent_days:
-                        news['sector'] = sector
-                        recent_news.append(news)
-                except Exception:
-                    continue
-            # Sort by published date descending
-            recent_news.sort(key=lambda n: n['published'], reverse=True)
-            news_list.extend(recent_news[:3])
-        # Fallback to general news if no sector news found
-        if not news_list:
-            news_list = fetch_general_news()
-            for news in news_list:
-                news['sector'] = 'general'
-        # Sort all news by published date descending
-        news_list.sort(key=lambda n: n['published'], reverse=True)
+        news_list = fetch_general_news(limit=5)
+        for news in news_list:
+            news['sector'] = 'general'
         return render_template("home.html", stocks=stocks, news_list=news_list, ticker_data=ticker_data)
 
     @app.route("/dashboard")
