@@ -2,6 +2,75 @@
 {% block title %}Home - Portfolio Manager{% endblock %}
 
 {% block body %}
+<style>
+    /* Sector filter styling */
+    #sectorFilter {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        background: white;
+        transition: all 0.3s ease;
+    }
+    
+    #sectorFilter:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+    
+    .news-item.hidden {
+        display: none !important;
+    }
+    
+    .filter-info {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-top: 8px;
+    }
+    
+    .news-item {
+        transition: all 0.3s ease;
+        border-bottom: 1px solid #e9ecef;
+        padding: 15px;
+        background: white;
+    }
+    
+    .news-item:hover {
+        background: #f8f9fa;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .news-item:last-child {
+        border-bottom: none !important;
+    }
+    
+    #newsGrid {
+        scrollbar-width: thin;
+        scrollbar-color: #dee2e6 #f8f9fa;
+    }
+    
+    #newsGrid::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    #newsGrid::-webkit-scrollbar-track {
+        background: #f8f9fa;
+        border-radius: 3px;
+    }
+    
+    #newsGrid::-webkit-scrollbar-thumb {
+        background: #dee2e6;
+        border-radius: 3px;
+    }
+    
+    #newsGrid::-webkit-scrollbar-thumb:hover {
+        background: #adb5bd;
+    }
+    
+    .badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+</style>
+
     <!-- 🔁 Continuous Ticker -->
 <div class="ticker-container">
     <div class="ticker-track">
@@ -55,23 +124,40 @@
             </div>
 
             <!-- News Feed -->
-            <div class="card shadow-sm flex-grow-1 d-flex flex-column" style="overflow: hidden;">
-                <div class="card-body d-flex flex-column">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="mb-0 fw-semibold text-dark">Latest Market News</h5>
-                        <select id="sectorFilter" class="form-select form-select-sm w-auto" style="min-width:160px;">
-                            <option value="all">All Sectors</option>
-                        </select>
+            <div class="card shadow-sm flex-grow-1" style="height: calc(78vh - 280px); overflow: hidden;">
+                <div class="card-body d-flex flex-column h-100 p-0">
+                    <div class="p-3 border-bottom">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0 fw-semibold text-dark">Latest Market News</h5>
+                            <div class="d-flex align-items-center gap-2">
+                                <select id="sectorFilter" class="form-select form-select-sm w-auto" style="min-width:160px;">
+                                    <option value="all">All Sectors</option>
+                                </select>
+                                <button id="clearNewsFilter" class="btn btn-sm btn-outline-secondary" style="display:none;">
+                                    <i class="fas fa-times"></i> Clear
+                                </button>
+                            </div>
+                        </div>
+                        <div id="filterInfo" class="filter-info mb-2"></div>
                     </div>
-                    <div id="newsGrid" class="flex-grow-1" style="overflow-y: auto;">
-                        {% for news in news_list[:10] %}
-                        <div class="py-3 border-bottom news-item" data-sector="general">
-                            <h6 class="mb-1 fw-medium text-dark">{{ news.title }}</h6>
+                    <div id="newsGrid" class="flex-grow-1" style="overflow-y: auto; height: calc(100% - 120px);">
+                        {% for news in news_list[:20] %}
+                        <div class="py-3 px-3 border-bottom news-item" data-sector="{{ news.sector|default('general') }}" data-sentiment="{{ news.sentiment|default('neutral') }}">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="mb-1 fw-medium text-dark">{{ news.title }}</h6>
+                                <span class="badge {% if news.sentiment == 'negative' %}bg-danger{% elif news.sentiment == 'positive' %}bg-success{% else %}bg-secondary{% endif %}">
+                                    {{ news.sentiment|default('neutral')|title }}
+                                </span>
+                            </div>
                             <div class="text-muted small mb-1">
                                 <i class="fas fa-building"></i> {{ news.source }} &bull;
-                                <i class="fas fa-clock"></i> {{ news.published }}
+                                <i class="fas fa-clock"></i> {{ news.published }} &bull;
+                                <i class="fas fa-chart-pie"></i> {{ news.sector|default('General') }}
                             </div>
-                            <a href="{{ news.url }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                            {% if news.description %}
+                            <p class="text-muted small mb-2">{{ news.description[:100] }}{% if news.description|length > 100 %}...{% endif %}</p>
+                            {% endif %}
+                            <a href="{{ news.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
                                 <i class="fas fa-external-link-alt"></i> Read More
                             </a>
                         </div>
@@ -122,6 +208,9 @@ function updateChart(symbol) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize sector filter for news
+    initializeNewsSectorFilter();
+    
     fetch('/api/top_stocks')
         .then(res => res.json())
         .then(stocks => {
@@ -151,28 +240,89 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
                 tbody.appendChild(tr);
             });
-            // Populate sector filter
-            const sectorFilter = document.getElementById('sectorFilter');
-            sectorFilter.innerHTML = '<option value="all">All Sectors</option>';
-            Array.from(stockSectors).sort().forEach(sector => {
-                sectorFilter.innerHTML += `<option value="${sector}">${sector}</option>`;
-            });
         });
 
-    // Sector filter for news
-    document.getElementById('sectorFilter').addEventListener('change', function() {
-        const selected = this.value.toLowerCase();
-        const newsItems = document.querySelectorAll('#newsGrid .news-item');
-        newsItems.forEach(item => {
-            const sector = (item.getAttribute('data-sector') || '').toLowerCase();
-            if (selected === 'all' || sector === selected || sector === 'general') {
-                item.style.display = '';
-            } else {
-                item.style.display = 'none';
-            }
-        });
-    });
+    // Enhanced sector filter for news
+    document.getElementById('sectorFilter').addEventListener('change', filterNewsBySector);
+    
+    // Clear filter button
+    document.getElementById('clearNewsFilter').addEventListener('click', clearNewsFilter);
 });
+
+// Initialize sector filter for news
+function initializeNewsSectorFilter() {
+    const sectorFilter = document.getElementById('sectorFilter');
+    const newsItems = document.querySelectorAll('.news-item');
+    const sectors = new Set();
+    
+    // Collect all unique sectors from news items
+    newsItems.forEach(item => {
+        const sector = item.dataset.sector;
+        if (sector && sector !== 'general') {
+            sectors.add(sector);
+        }
+    });
+    
+    // Populate dropdown with sectors
+    sectors.forEach(sector => {
+        const option = document.createElement('option');
+        option.value = sector;
+        option.textContent = sector;
+        sectorFilter.appendChild(option);
+    });
+    
+    // Initialize filter info
+    setTimeout(() => {
+        filterNewsBySector();
+    }, 100);
+}
+
+// Filter news by sector
+function filterNewsBySector() {
+    const selectedSector = document.getElementById('sectorFilter').value;
+    const newsItems = document.querySelectorAll('.news-item');
+    const clearFilterBtn = document.getElementById('clearNewsFilter');
+    let visibleCount = 0;
+    
+    newsItems.forEach(item => {
+        const itemSector = item.dataset.sector;
+        if (selectedSector === 'all' || itemSector === selectedSector) {
+            item.style.display = 'block';
+            item.classList.remove('hidden');
+            visibleCount++;
+        } else {
+            item.style.display = 'none';
+            item.classList.add('hidden');
+        }
+    });
+    
+    // Show/hide clear filter button
+    if (selectedSector === 'all') {
+        clearFilterBtn.style.display = 'none';
+    } else {
+        clearFilterBtn.style.display = 'inline-block';
+    }
+    
+    // Update filter info
+    updateNewsFilterInfo(selectedSector, visibleCount, newsItems.length);
+}
+
+// Clear news filter
+function clearNewsFilter() {
+    document.getElementById('sectorFilter').value = 'all';
+    filterNewsBySector();
+}
+
+// Update filter information display
+function updateNewsFilterInfo(selectedSector, visibleCount, totalCount) {
+    const filterInfo = document.getElementById('filterInfo');
+    
+    if (selectedSector === 'all') {
+        filterInfo.textContent = `Showing all ${totalCount} news articles`;
+    } else {
+        filterInfo.textContent = `Showing ${visibleCount} of ${totalCount} articles for ${selectedSector}`;
+    }
+}
 </script>
 
 {% endblock %}
