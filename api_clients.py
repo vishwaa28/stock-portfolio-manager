@@ -2,32 +2,79 @@ import requests
 import random
 import os
 from datetime import datetime, timedelta
+import time
+from functools import lru_cache
 
 # Finnhub API key (get from https://finnhub.io)
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "d1d3ap9r01qic6lgtil0d1d3ap9r01qic6lgtilg")
+
+# Simple in-memory cache
+_cache = {}
+_cache_timeout = int(os.getenv("CACHE_TIMEOUT", "300"))  # 5 minutes default
+_enable_caching = os.getenv("ENABLE_CACHING", "True").lower() == "true"
+
+def _get_cached_data(key):
+    if not _enable_caching:
+        return None
+    if key in _cache:
+        data, timestamp = _cache[key]
+        if time.time() - timestamp < _cache_timeout:
+            return data
+    return None
+
+def _set_cached_data(key, data):
+    if not _enable_caching:
+        return
+    _cache[key] = (data, time.time())
 
 STOCK_DATA = {
     "AAPL": {"name": "Apple Inc.", "sector": "Technology"},
     "GOOGL": {"name": "Alphabet Inc.", "sector": "Technology"},
     "AMZN": {"name": "Amazon.com Inc.", "sector": "Consumer Discretionary"},
     "TSLA": {"name": "Tesla Inc.", "sector": "Automotive"},
-
 }
 
+# Pre-defined sector mappings to avoid API calls
+SECTOR_SYMBOLS = {
+    "Technology": ["AAPL", "GOOGL", "MSFT", "NVDA", "META"],
+    "Consumer Discretionary": ["AMZN", "TSLA", "NFLX", "HD", "MCD"],
+    "Healthcare": ["JNJ", "PFE", "UNH", "ABBV", "MRK"],
+    "Financial Services": ["JPM", "BAC", "WFC", "GS", "MS"],
+    "Communication Services": ["GOOGL", "META", "NFLX", "DIS", "CMCSA"],
+    "Industrial": ["BA", "CAT", "GE", "MMM", "HON"],
+    "Energy": ["XOM", "CVX", "COP", "EOG", "SLB"],
+    "Consumer Staples": ["PG", "KO", "WMT", "COST", "PEP"],
+    "Real Estate": ["SPG", "PLD", "EQIX", "AMT", "CCI"],
+    "Materials": ["LIN", "APD", "FCX", "NEM", "DOW"],
+    "Utilities": ["NEE", "DUK", "SO", "D", "AEP"]
+}
+
+@lru_cache(maxsize=100)
 def fetch_price(symbol):
+    cache_key = f"price_{symbol}"
+    cached = _get_cached_data(cache_key)
+    if cached:
+        return cached
+        
     url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={FINNHUB_API_KEY}"
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=5)
         data = response.json()
-        price = data.get("c")  # current price
+        price = data.get("c")
         if price:
-            return round(price, 2)
+            result = round(price, 2)
+            _set_cached_data(cache_key, result)
+            return result
         else:
             print(f"No Finnhub price data for {symbol}")
-            return round(STOCK_DATA.get(symbol, {}).get("base_price", random.uniform(10, 500)), 2)
+            result = round(STOCK_DATA.get(symbol, {}).get("base_price", random.uniform(10, 500)), 2)
+            _set_cached_data(cache_key, result)
+            return result
     except Exception as e:
         print(f"Finnhub price error: {e}")
-        return round(STOCK_DATA.get(symbol, {}).get("base_price", random.uniform(10, 500)), 2)
+        result = round(STOCK_DATA.get(symbol, {}).get("base_price", random.uniform(10, 500)), 2)
+        _set_cached_data(cache_key, result)
+        return result
 
 def analyze_sentiment(text):
     text = text.lower()
@@ -41,12 +88,18 @@ def analyze_sentiment(text):
             return "positive"
     return "neutral"
 
+@lru_cache(maxsize=50)
 def fetch_news(symbol, limit=5):
+    cache_key = f"news_{symbol}_{limit}"
+    cached = _get_cached_data(cache_key)
+    if cached:
+        return cached
+        
     if symbol not in STOCK_DATA:
         return []
     url = f"https://finnhub.io/api/v1/company-news?symbol={symbol}&from={(datetime.now() - timedelta(days=7)).date()}&to={datetime.now().date()}&token={FINNHUB_API_KEY}"
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
         data = response.json()
         news_items = []
         for item in data[:limit]:
@@ -59,15 +112,22 @@ def fetch_news(symbol, limit=5):
                 "published": datetime.fromtimestamp(item.get("datetime")).strftime('%Y-%m-%d'),
                 "sentiment": sentiment
             })
+        _set_cached_data(cache_key, news_items)
         return news_items
     except Exception as e:
         print(f"Finnhub news error: {e}")
         return []
 
+@lru_cache(maxsize=10)
 def fetch_general_news(limit=10):
+    cache_key = f"general_news_{limit}"
+    cached = _get_cached_data(cache_key)
+    if cached:
+        return cached
+        
     url = f"https://finnhub.io/api/v1/news?category=general&token={FINNHUB_API_KEY}"
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
 
@@ -87,13 +147,13 @@ def fetch_general_news(limit=10):
                 print(f"Error processing news item: {e}")
                 continue
 
+        _set_cached_data(cache_key, news_items)
         return news_items
-
 
     except Exception as e:
         print(f"Finnhub general news error: {e}")
         # Return mock news if API fails
-        return [
+        mock_news = [
             {
                 "title": "Market Update: Stocks Show Mixed Performance",
                 "description": "Major indices show mixed performance as investors weigh economic data.",
@@ -135,6 +195,8 @@ def fetch_general_news(limit=10):
                 "sector": "general"
             }
         ]
+        _set_cached_data(cache_key, mock_news)
+        return mock_news
 
 def fetch_all_stocks():
     stocks = []
@@ -171,21 +233,36 @@ def get_market_summary():
         "market_sentiment": "positive" if up_count > down_count else "negative"
     }
 
+@lru_cache(maxsize=5)
 def fetch_all_symbols(exchange="US"):
+    cache_key = f"symbols_{exchange}"
+    cached = _get_cached_data(cache_key)
+    if cached:
+        return cached
+        
     url = f"https://finnhub.io/api/v1/stock/symbol?exchange={exchange}&token={FINNHUB_API_KEY}"
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=15)
         data = response.json()
+        _set_cached_data(cache_key, data)
         return data  # list of dicts with 'symbol', 'description', etc.
     except Exception as e:
         print(f"Error fetching symbols: {e}")
         return []
 
+@lru_cache(maxsize=100)
 def fetch_company_profile(symbol):
+    cache_key = f"profile_{symbol}"
+    cached = _get_cached_data(cache_key)
+    if cached:
+        return cached
+        
     url = f"https://finnhub.io/api/v1/stock/profile2?symbol={symbol}&token={FINNHUB_API_KEY}"
     try:
-        response = requests.get(url)
-        return response.json()
+        response = requests.get(url, timeout=5)
+        data = response.json()
+        _set_cached_data(cache_key, data)
+        return data
     except Exception as e:
         print(f"Error fetching company profile for {symbol}: {e}")
         return {}
@@ -193,22 +270,23 @@ def fetch_company_profile(symbol):
 def fetch_previous_close(symbol):
     url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={FINNHUB_API_KEY}"
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=5)
         data = response.json()
         return data.get("pc")  # previous close
     except:
         return None
 
 def fetch_detailed_stocks(limit=10):
+    # Use a smaller, predefined list for better performance
+    popular_symbols = ["AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "META", "NVDA", "NFLX", "JPM", "JNJ"]
     stocks = []
-    symbols = fetch_all_symbols()
-    for item in symbols[:limit]:  # Limit for demo/testing
-        symbol = item["symbol"]
+    
+    for symbol in popular_symbols[:limit]:
         profile = fetch_company_profile(symbol)
         # Fetch quote data for price, previous close, and volume
         url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={FINNHUB_API_KEY}"
         try:
-            response = requests.get(url)
+            response = requests.get(url, timeout=5)
             data = response.json()
             price = data.get("c")
             previous_close = data.get("pc")
@@ -237,18 +315,16 @@ def fetch_detailed_stocks(limit=10):
     return stocks
 
 def fetch_sector_news(sector_name, limit=5):
-    all_symbols = fetch_all_symbols()
-    sector_symbols = []
+    # Use predefined sector symbols instead of fetching all symbols
+    sector_symbols = SECTOR_SYMBOLS.get(sector_name, [])
+    
+    if not sector_symbols:
+        # Fallback: return empty list instead of making expensive API calls
+        return []
 
-    for item in all_symbols:
-        symbol = item["symbol"]
-        profile = fetch_company_profile(symbol)
-        if profile.get("finnhubIndustry", "").lower() == sector_name.lower():
-            sector_symbols.append(symbol)
-
-    # Get news from up to 5 companies in the sector
+    # Get news from up to 3 companies in the sector (reduced from 5)
     sector_news = []
-    for symbol in sector_symbols[:5]:
+    for symbol in sector_symbols[:3]:
         news = fetch_news(symbol, limit=limit)
         sector_news.extend(news)
     return sector_news

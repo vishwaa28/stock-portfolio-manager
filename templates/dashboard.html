@@ -14,10 +14,20 @@
                     </h1>
                     <p class="text-muted">Monitor your investments and market alerts</p>
                 </div>
-                <div>
-{#                    <a href="{{ url_for('add_stock') }}" class="btn btn-primary me-2">#}
-{#                        <i class="fas fa-plus"></i> Add Stock#}
-{#                    </a>#}
+                <div class="d-flex align-items-center gap-3">
+                    <div class="position-relative dropdown">
+                        <i class="fas fa-bell fs-4 text-muted cursor-pointer" id="notificationIcon" data-bs-toggle="dropdown" aria-expanded="false"></i>
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="alertCount" style="display: none;">
+                            0
+                        </span>
+                        <ul class="dropdown-menu dropdown-menu-end" id="alertDropdown" style="width: 350px; max-height: 400px; overflow-y: auto;">
+                            <li><h6 class="dropdown-header">Active Alerts</h6></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li id="alertList">
+                                <span class="dropdown-item-text text-muted">No active alerts</span>
+                            </li>
+                        </ul>
+                    </div>
                     <button class="btn btn-outline-primary" onclick="refreshDashboard()">
                         <i class="fas fa-sync-alt"></i> Refresh
                     </button>
@@ -26,159 +36,826 @@
         </div>
     </div>
 
-    <!-- Portfolio Summary -->
-    <div class="container mb-4">
-  <div class="row g-3">
-    <div class="col-md-3 col-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div class="icon-box bg-light text-dark"><i class="fas fa-wallet"></i></div>
-          <div>
-            <div class="fw-bold fs-4">${{ total_value }}</div>
-            <div class="text-muted small">Total Value</div>
-          </div>
+    <!-- Portfolio Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3 col-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <div class="icon-box bg-light text-dark"><i class="fas fa-wallet"></i></div>
+                    <div>
+                        <div class="fw-bold fs-4">${{ "%.2f"|format(total_value) }}</div>
+                        <div class="text-muted small">Total Value</div>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-    <div class="col-md-3 col-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div class="icon-box bg-light text-dark"><i class="fas fa-arrow-up"></i></div>
-          <div>
-            <div class="fw-bold fs-4 text-success"> {{ table|selectattr("sentiment_class", "equalto", "positive")|list|length }}</div>
-            <div class="text-muted small">Positive Sentiment</div>
-          </div>
+        <div class="col-md-3 col-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <div class="icon-box bg-light text-dark"><i class="fas fa-arrow-up"></i></div>
+                    <div>
+                        <div class="fw-bold fs-4 text-success">{{ table|selectattr("sentiment_class", "equalto", "positive")|list|length }}</div>
+                        <div class="text-muted small">Positive Sentiment</div>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-    <div class="col-md-3 col-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div class="icon-box bg-light text-dark"><i class="fas fa-chart-line"></i></div>
-          <div>
-            <div class="fw-bold fs-4 text-success">{{ table|length }}</div>
-            <div class="text-muted small">Stocks Tracked</div>
-          </div>
+        <div class="col-md-3 col-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <div class="icon-box bg-light text-dark"><i class="fas fa-chart-line"></i></div>
+                    <div>
+                        <div class="fw-bold fs-4 text-primary">{{ table|length }}</div>
+                        <div class="text-muted small">Stocks Tracked</div>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-    <div class="col-md-3 col-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div class="icon-box bg-light text-dark"><i class="fas fa-layer-group"></i></div>
-          <div>
-            <div class="fw-bold fs-4"> {{ (table|selectattr("alerts")|list|length) }}</div>
-            <div class="text-muted small">Active Alerts</div>
-          </div>
+        <div class="col-md-3 col-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <div class="icon-box bg-light text-dark"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div>
+                        <div class="fw-bold fs-4 text-warning" id="totalAlerts">{{ (table|selectattr("alerts")|list|length) }}</div>
+                        <div class="text-muted small">Active Alerts</div>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
     </div>
-  </div>
-</div>
-    {% if table %}
-        <!-- Grid Layout -->
-        <div class="row">
-    <!-- Left Side: Stock Cards -->
-    <div class="col-md-8">
-        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
-            {% for row in table %}
-            <div class="col">
-                <div class="card h-100 shadow-sm">
-                    <div class="card-body p-2">
-                        <h6 class="card-title mb-1">{{ row.symbol }}</h6>
-                        <p class="card-text mb-1"><strong>Price:</strong> ${{ "%.2f"|format(row.price) }}</p>
-                        <p class="card-text mb-2"><strong>Sentiment:</strong>
-                            <span class="sentiment-{{ row.sentiment_class }}">{{ row.sentiment_text }}</span>
-                        </p>
-                        <div class="mb-2">
-                            <strong>News:</strong>
-                            <ul class="list-unstyled mb-1">
-                                {% for article in row.news[:2] %}
-                                <li class="mb-1">
-                                    <a href="{{ article.url }}" target="_blank" class="text-decoration-none">
-                                        <small><strong>{{ article.title[:40] }}...</strong></small>
-                                    </a><br>
-                                    <small class="text-muted">{{ article.source }} - {{ article.published[:10] }}</small>
-                                </li>
-                                {% endfor %}
-                            </ul>
-                            {% if row.news|length > 2 %}
-                            <small class="text-muted">+{{ row.news|length - 2 }} more</small>
-                            {% endif %}
-                        </div>
 
-                        <div class="mb-2">
-                            <strong>Alerts:</strong><br>
-                            {% if row.alerts %}
-                                {% for alert in row.alerts[:2] %}
-                                <div class="alert alert-warning alert-sm py-1 px-2 mb-1">
-                                    <small>{{ alert[:50] }}...</small>
-                                </div>
+    {% if table %}
+    <div class="row g-4">
+        <!-- Left Side: Portfolio Stocks Table -->
+        <div class="col-12 col-lg-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="mb-3 fw-semibold text-dark">Portfolio Holdings</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead style="background:#f8f9fa;">
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Name</th>
+                                    <th>Price</th>
+                                    <th>Change</th>
+                                    <th>Sentiment</th>
+                                    <th>Score</th>
+                                    <th>Alerts</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in table %}
+                                <tr class="stock-row" data-symbol="{{ row.symbol }}" style="cursor: pointer;">
+                                    <td><strong>{{ row.symbol }}</strong></td>
+                                    <td><small class="text-muted">{{ row.name|default('N/A') }}</small></td>
+                                    <td class="stock-price" data-symbol="{{ row.symbol }}">${{ "%.2f"|format(row.price) }}</td>
+                                    <td class="{% if row.change > 0 %}text-success{% elif row.change < 0 %}text-danger{% endif %}">
+                                        {{ "%.2f"|format(row.change|default(0)) }}
+                                    </td>
+                                    <td>
+                                        <span class="badge sentiment-{{ row.sentiment_class }}">
+                                            {{ row.sentiment_text }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if row.sentiment_score > 0.7 %}bg-success{% elif row.sentiment_score < 0.3 %}bg-danger{% else %}bg-warning{% endif %}">
+                                            {{ "%.1f"|format(row.sentiment_score|default(0.5)) }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if row.alerts %}
+                                            <span class="badge bg-warning text-dark">{{ row.alerts|length }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
                                 {% endfor %}
-                                {% if row.alerts|length > 2 %}
-                                <small class="text-muted">+{{ row.alerts|length - 2 }} more</small>
-                                {% endif %}
-                            {% else %}
-                                <span class="text-muted">No alerts</span>
-                            {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dynamic Chart Section -->
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0 fw-semibold text-dark">
+                            <i class="fas fa-chart-line me-2"></i>
+                            <span id="chartTitle">Select a stock to view chart</span>
+                        </h5>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <input type="radio" class="btn-check" name="chartPeriod" id="period1m" value="1M" checked>
+                            <label class="btn btn-outline-primary" for="period1m">1M</label>
+                            
+                            <input type="radio" class="btn-check" name="chartPeriod" id="period3m" value="3M">
+                            <label class="btn btn-outline-primary" for="period3m">3M</label>
+                            
+                            <input type="radio" class="btn-check" name="chartPeriod" id="period6m" value="6M">
+                            <label class="btn btn-outline-primary" for="period6m">6M</label>
+                            
+                            <input type="radio" class="btn-check" name="chartPeriod" id="period1y" value="1Y">
+                            <label class="btn btn-outline-primary" for="period1y">1Y</label>
+                        </div>
+                    </div>
+                    
+                    <!-- Chart Container -->
+                    <div class="chart-container" style="position: relative; height: 300px;">
+                        <canvas id="portfolioChart"></canvas>
+                        <div id="chartLoading" class="chart-loading" style="display: none;">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2 text-muted">Loading chart data...</p>
+                        </div>
+                        <div id="chartPlaceholder" class="chart-placeholder">
+                            <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">Click on any stock in the table above to view its price chart</p>
                         </div>
                     </div>
                 </div>
             </div>
-            {% endfor %}
         </div>
-    </div>
 
-    <!-- Right Side: News Panel -->
-    <div class="col-md-4">
-        <div class="card shadow-sm h-100">
-            <div class="card-header bg-info text-white">
-                <h6 class="mb-0">Portfolio News</h6>
-            </div>
-            <div class="card-body overflow-auto" style="max-height: 75vh;">
-                {% for article in portfolio_news %}
-                <div class="mb-3">
-                    <a href="{{ article.url }}" target="_blank" class="text-decoration-none">
-                        <strong>{{ article.title[:60] }}...</strong>
-                    </a><br>
-                    <small class="text-muted">{{ article.source }} - {{ article.published[:10] }}</small>
-                    <div class="text-muted"><small>Sentiment: <span class="sentiment-{{ article.sentiment }}">{{ article.sentiment }}</span></small></div>
+        <!-- Right Side: Portfolio News -->
+        <div class="col-12 col-lg-4">
+            <div class="card shadow-sm h-200">
+                <div class="card-body">
+                    <h5 class="mb-3 fw-semibold text-dark">Portfolio News</h5>
+                    <div id="portfolioNews" style="max-height: 60vh; overflow-y: auto;">
+                        {% for row in table %}
+                            {% for article in row.news[:3] %}
+                            <div class="mb-3 p-3 border rounded news-card" data-sentiment="{{ article.sentiment }}" data-score="{{ article.sentiment_score|default(0.5) }}" data-sector="{{ article.sector|default('Unknown') }}" data-symbol="{{ article.symbol|default(row.symbol) }}">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="mb-1 fw-medium text-dark">{{ article.title[:70] }}{% if article.title|length > 70 %}...{% endif %}</h6>
+                                    <span class="badge {% if article.sentiment == 'negative' and article.sentiment_score|default(0.5) > 0.7 %}bg-danger{% elif article.sentiment == 'positive' %}bg-success{% else %}bg-secondary{% endif %}">
+                                        {{ article.sentiment|title }}
+                                    </span>
+                                </div>
+                                <div class="mb-2">
+                                    <span class="badge bg-info me-1">{{ article.symbol|default(row.symbol) }}</span>
+                                    <span class="badge bg-secondary">{{ article.sector|default('Unknown') }}</span>
+                                </div>
+                                <p class="text-muted small mb-2">
+                                    <i class="fas fa-newspaper me-1"></i>{{ article.source|default('Unknown') }} 
+                                    <i class="fas fa-calendar ms-2 me-1"></i>{{ article.published|default('N/A') }}
+                                </p>
+                                {% if article.description %}
+                                <p class="text-muted small mb-2">{{ article.description[:100] }}{% if article.description|length > 100 %}...{% endif %}</p>
+                                {% endif %}
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">
+                                        <i class="fas fa-chart-line me-1"></i>Score: {{ "%.2f"|format(article.sentiment_score|default(0.5)) }}
+                                    </small>
+                                    <a href="{{ article.url|default('#') }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-external-link-alt"></i> Read
+                                    </a>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% endfor %}
+                        {% if not table|selectattr('news')|list %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-newspaper fa-2x text-muted mb-2"></i>
+                            <p class="text-muted">No news available for your portfolio</p>
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
-                {% endfor %}
-                {% if portfolio_news|length == 0 %}
-                <p class="text-muted">No recent news found for your portfolio.</p>
-                {% endif %}
             </div>
         </div>
     </div>
-</div>
 
     {% else %}
-        <!-- Empty State -->
-        <div class="text-center py-5">
-            <div class="card">
-                <div class="card-body py-5">
-                    <i class="fas fa-chart-line fa-4x text-muted mb-3"></i>
-                    <h3 class="text-muted">Your portfolio is empty</h3>
-                    <p class="text-muted mb-4">Start by adding some stocks to track your investments</p>
-                    <a href="{{ url_for('add_stock') }}" class="btn btn-primary btn-lg">
-                        <i class="fas fa-plus"></i> Add Your First Stock
-                    </a>
-                </div>
+    <!-- Empty State -->
+    <div class="text-center py-5">
+        <div class="card">
+            <div class="card-body py-5">
+                <i class="fas fa-chart-line fa-4x text-muted mb-3"></i>
+                <h3 class="text-muted">Your portfolio is empty</h3>
+                <p class="text-muted mb-4">Start by adding some stocks to track your investments</p>
+                <a href="{{ url_for('add_stock') }}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-plus"></i> Add Your First Stock
+                </a>
             </div>
         </div>
+    </div>
     {% endif %}
 </div>
 
 <style>
-.alert-sm { font-size: 0.75rem; }
-.news-item { border-left: 3px solid #667eea; padding-left: 8px; }
-.alerts-container .alert { border-radius: 8px; }
-.dashboard-stat { position: relative; overflow: hidden; }
-.dashboard-stat::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 3px; background: var(--primary-gradient); transition: left 0.3s ease; }
-.dashboard-stat:hover::before { left: 0; }
-</style>
-{% endblock %}
+/* Professional Dashboard Styling */
+:root {
+    --primary-color: #667eea;
+    --secondary-color: #764ba2;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #17a2b8;
+    --light-color: #f8f9fa;
+    --dark-color: #343a40;
+    --border-radius: 12px;
+    --box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    --box-shadow-hover: 0 8px 30px rgba(0,0,0,0.12);
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
-{% block scripts %}
+/* Sentiment Badges */
+.sentiment-positive { 
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    color: #155724; 
+    border: 1px solid #c3e6cb;
+    font-weight: 600;
+}
+
+.sentiment-negative { 
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+    color: #721c24; 
+    border: 1px solid #f5c6cb;
+    font-weight: 600;
+}
+
+.sentiment-neutral { 
+    background: linear-gradient(135deg, #e2e3e5 0%, #d6d8db 100%);
+    color: #383d41; 
+    border: 1px solid #d6d8db;
+    font-weight: 600;
+}
+
+/* Icon Boxes */
+.icon-box { 
+    width: 50px; 
+    height: 50px; 
+    border-radius: var(--border-radius); 
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 1px solid #dee2e6;
+}
+
+/* Cursor Pointer */
+.cursor-pointer { 
+    cursor: pointer; 
+    transition: var(--transition);
+}
+
+.cursor-pointer:hover {
+    transform: scale(1.1);
+}
+
+/* News Cards */
+.news-card { 
+    transition: var(--transition); 
+    border: 1px solid #e9ecef;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: var(--border-radius);
+    position: relative;
+    overflow: hidden;
+}
+
+.news-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    opacity: 0;
+    transition: var(--transition);
+}
+
+.news-card:hover { 
+    transform: translateY(-3px); 
+    box-shadow: var(--box-shadow-hover);
+    border-color: var(--primary-color);
+}
+
+.news-card:hover::before {
+    opacity: 1;
+}
+
+/* Dropdown Styling */
+.dropdown-menu { 
+    border: none; 
+    box-shadow: var(--box-shadow-hover);
+    border-radius: var(--border-radius);
+    border: 1px solid #e9ecef;
+}
+
+.dropdown-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    font-weight: 600;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+    margin: -0.5rem -0.5rem 0.5rem -0.5rem;
+    padding: 0.75rem 1rem;
+}
+
+/* Alert Items */
+.alert-item { 
+    border-left: 4px solid var(--danger-color); 
+    padding: 12px 15px;
+    margin: 8px 0;
+    background: linear-gradient(135deg, #fff5f5 0%, #ffe6e6 100%);
+    border-radius: 8px;
+    border: 1px solid #f5c6cb;
+    transition: var(--transition);
+}
+
+.alert-item:hover {
+    transform: translateX(5px);
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.2);
+}
+
+/* Cards */
+.card {
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    transition: var(--transition);
+    background: white;
+    overflow: hidden;
+}
+
+.card:hover {
+    box-shadow: var(--box-shadow-hover);
+    transform: translateY(-2px);
+}
+
+/* Table Styling */
+.table {
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    margin-bottom: 0;
+}
+
+.table thead th {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    color: white;
+    border: none;
+    font-weight: 600;
+    padding: 15px 12px;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.table tbody tr {
+    transition: var(--transition);
+    border-bottom: 1px solid #f8f9fa;
+}
+
+.table tbody tr:hover {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+    transform: scale(1.01);
+}
+
+.table tbody td {
+    padding: 12px;
+    vertical-align: middle;
+    border: none;
+}
+
+/* Badges */
+.badge {
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+/* Buttons */
+.btn {
+    border-radius: 25px;
+    font-weight: 600;
+    transition: var(--transition);
+    border: none;
+    padding: 8px 16px;
+    font-size: 0.875rem;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.btn-outline-primary {
+    border: 2px solid var(--primary-color);
+    color: var(--primary-color);
+}
+
+.btn-outline-primary:hover {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    border-color: var(--primary-color);
+}
+
+/* Notification Icon */
+#notificationIcon {
+    transition: var(--transition);
+    padding: 8px;
+    border-radius: 50%;
+}
+
+#notificationIcon:hover {
+    transform: scale(1.1);
+    color: var(--primary-color) !important;
+    background: rgba(102, 126, 234, 0.1);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .table thead th {
+        font-size: 0.8rem;
+        padding: 10px 8px;
+    }
+    
+    .table tbody td {
+        padding: 8px;
+        font-size: 0.875rem;
+    }
+    
+    .badge {
+        font-size: 0.7rem;
+        padding: 4px 8px;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+}
+
+/* Loading Animation */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.loading {
+    animation: pulse 1.5s infinite;
+}
+
+/* Scrollbar Styling */
+#portfolioNews::-webkit-scrollbar {
+    width: 6px;
+}
+
+#portfolioNews::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+#portfolioNews::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    border-radius: 3px;
+}
+
+#portfolioNews::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #5a6fd8, #6a4c93);
+}
+
+/* Chart Styling */
+.chart-container {
+    position: relative;
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 20px;
+    border: 1px solid #e9ecef;
+}
+
+.chart-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 10;
+}
+
+.chart-placeholder {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 5;
+}
+
+/* Stock Row Hover Effects */
+.stock-row {
+    transition: var(--transition);
+}
+
+.stock-row:hover {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%) !important;
+    transform: scale(1.01);
+}
+
+.stock-row.selected {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%) !important;
+    border-left: 4px solid var(--primary-color);
+}
+
+/* Chart Period Buttons */
+.btn-check:checked + .btn-outline-primary {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    border-color: var(--primary-color);
+    color: white;
+}
+
+.btn-outline-primary {
+    border: 2px solid var(--primary-color);
+    color: var(--primary-color);
+    font-weight: 600;
+    transition: var(--transition);
+}
+
+.btn-outline-primary:hover {
+    background: rgba(102, 126, 234, 0.1);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let chartInstance = null;
+let selectedStock = null;
+let currentPeriod = '1M';
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Collect all alerts from both news and table data
+    let allAlerts = [];
+    
+    // Get alerts from news items
+    const newsItems = document.querySelectorAll('#portfolioNews [data-sentiment="negative"]');
+    newsItems.forEach(item => {
+        const score = parseFloat(item.getAttribute('data-score'));
+        const symbol = item.getAttribute('data-symbol');
+        const sector = item.getAttribute('data-sector');
+        if (score > 0.7) {
+            allAlerts.push({
+                symbol: symbol,
+                sector: sector,
+                score: score,
+                title: item.querySelector('h6').textContent,
+                type: 'news'
+            });
+        }
+    });
+    
+    // Get alerts from table data (price targets, etc.)
+    const tableRows = document.querySelectorAll('tbody tr');
+    tableRows.forEach(row => {
+        const alertCell = row.querySelector('td:last-child .badge');
+        if (alertCell && alertCell.textContent !== '-') {
+            const symbol = row.querySelector('td:first-child strong').textContent;
+            allAlerts.push({
+                symbol: symbol,
+                sector: 'Portfolio',
+                score: 0.8,
+                title: `Alert for ${symbol}`,
+                type: 'portfolio'
+            });
+        }
+    });
+    
+    // Update notification icon
+    const notificationIcon = document.getElementById('notificationIcon');
+    const alertCountBadge = document.getElementById('alertCount');
+    const alertList = document.getElementById('alertList');
+    
+    if (allAlerts.length > 0) {
+        notificationIcon.classList.remove('text-muted');
+        notificationIcon.classList.add('text-warning');
+        alertCountBadge.textContent = allAlerts.length;
+        alertCountBadge.style.display = 'block';
+        
+        // Populate alert dropdown
+        alertList.innerHTML = '';
+        allAlerts.forEach(alert => {
+            const alertItem = document.createElement('div');
+            alertItem.className = 'dropdown-item alert-item';
+            alertItem.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <strong>${alert.symbol}</strong> (${alert.sector})
+                        <br><small class="text-muted">${alert.title}</small>
+                    </div>
+                    <span class="badge bg-danger">${alert.score.toFixed(2)}</span>
+                </div>
+            `;
+            alertList.appendChild(alertItem);
+        });
+    } else {
+        alertList.innerHTML = '<span class="dropdown-item-text text-muted">No active alerts</span>';
+    }
+
+    // Stock row click handlers
+    const stockRows = document.querySelectorAll('.stock-row');
+    stockRows.forEach(row => {
+        row.addEventListener('click', function() {
+            const symbol = this.getAttribute('data-symbol');
+            selectStock(symbol, this);
+        });
+    });
+
+    // Chart period change handlers
+    const periodButtons = document.querySelectorAll('input[name="chartPeriod"]');
+    periodButtons.forEach(button => {
+        button.addEventListener('change', function() {
+            currentPeriod = this.value;
+            if (selectedStock) {
+                updateChart(selectedStock, currentPeriod);
+            }
+        });
+    });
+});
+
+function selectStock(symbol, rowElement) {
+    // Remove previous selection
+    document.querySelectorAll('.stock-row').forEach(row => {
+        row.classList.remove('selected');
+    });
+    
+    // Add selection to clicked row
+    rowElement.classList.add('selected');
+    
+    // Update chart title
+    document.getElementById('chartTitle').textContent = `${symbol} Price Chart`;
+    
+    // Update chart
+    selectedStock = symbol;
+    updateChart(symbol, currentPeriod);
+}
+
+function updateChart(symbol, period) {
+    const chartContainer = document.querySelector('.chart-container');
+    const chartLoading = document.getElementById('chartLoading');
+    const chartPlaceholder = document.getElementById('chartPlaceholder');
+    const canvas = document.getElementById('portfolioChart');
+    
+    // Show loading
+    chartLoading.style.display = 'block';
+    chartPlaceholder.style.display = 'none';
+    canvas.style.display = 'none';
+    
+    // Calculate days based on period
+    let days;
+    switch(period) {
+        case '1M': days = 30; break;
+        case '3M': days = 90; break;
+        case '6M': days = 180; break;
+        case '1Y': days = 365; break;
+        default: days = 30;
+    }
+    
+    // Fetch chart data
+    fetch(`/api/stock_history/${symbol}?days=${days}`)
+        .then(response => response.json())
+        .then(data => {
+            chartLoading.style.display = 'none';
+            canvas.style.display = 'block';
+            
+            if (data && data.length > 0) {
+                createChart(data, symbol);
+            } else {
+                showChartError('No data available for this period');
+            }
+        })
+        .catch(error => {
+            console.error('Chart error:', error);
+            chartLoading.style.display = 'none';
+            showChartError('Failed to load chart data');
+        });
+}
+
+function createChart(data, symbol) {
+    const ctx = document.getElementById('portfolioChart').getContext('2d');
+    
+    // Destroy existing chart
+    if (chartInstance) {
+        chartInstance.destroy();
+    }
+    
+    // Prepare data
+    const labels = data.map(item => item.date);
+    const prices = data.map(item => item.price);
+    
+    // Calculate color based on price trend
+    const firstPrice = prices[0];
+    const lastPrice = prices[prices.length - 1];
+    const isPositive = lastPrice >= firstPrice;
+    
+    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+    if (isPositive) {
+        gradient.addColorStop(0, 'rgba(40, 167, 69, 0.2)');
+        gradient.addColorStop(1, 'rgba(40, 167, 69, 0.05)');
+    } else {
+        gradient.addColorStop(0, 'rgba(220, 53, 69, 0.2)');
+        gradient.addColorStop(1, 'rgba(220, 53, 69, 0.05)');
+    }
+    
+    // Create new chart
+    chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: `${symbol} Price`,
+                data: prices,
+                borderColor: isPositive ? '#28a745' : '#dc3545',
+                backgroundColor: gradient,
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 6,
+                pointHoverBackgroundColor: isPositive ? '#28a745' : '#dc3545',
+                pointHoverBorderColor: '#fff',
+                pointHoverBorderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: isPositive ? '#28a745' : '#dc3545',
+                    borderWidth: 1,
+                    cornerRadius: 8,
+                    displayColors: false,
+                    callbacks: {
+                        title: function(context) {
+                            return `${symbol} - ${context[0].label}`;
+                        },
+                        label: function(context) {
+                            return `Price: $${context.parsed.y.toFixed(2)}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    display: true,
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: '#6c757d',
+                        maxTicksLimit: 8
+                    }
+                },
+                y: {
+                    display: true,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    },
+                    ticks: {
+                        color: '#6c757d',
+                        callback: function(value) {
+                            return '$' + value.toFixed(2);
+                        }
+                    }
+                }
+            },
+            elements: {
+                point: {
+                    hoverRadius: 6
+                }
+            }
+        }
+    });
+}
+
+function showChartError(message) {
+    const chartPlaceholder = document.getElementById('chartPlaceholder');
+    chartPlaceholder.innerHTML = `
+        <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+        <p class="text-muted">${message}</p>
+    `;
+    chartPlaceholder.style.display = 'block';
+}
+
+function refreshDashboard() {
+    location.reload();
+}
+</script>
+
 {% endblock %}

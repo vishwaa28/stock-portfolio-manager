@@ -513,7 +513,7 @@
     {% endwith %}
 
     <!-- Main Content -->
-    <main class="container-fluid px-1 my-4">
+    <main class="container-fluid px-4 my-4">
         {% block body %}{% endblock %}
     </main>
 
@@ -583,15 +583,27 @@
 
         // Auto-refresh prices every 30 seconds
         function refreshPrices() {
-            const priceElements = document.querySelectorAll('[data-symbol]');
+            // Only target elements that are specifically price elements, not news cards
+            const priceElements = document.querySelectorAll('.stock-price[data-symbol]');
+            
+            if (priceElements.length === 0) {
+                return; // No price elements to update
+            }
+            
             priceElements.forEach(element => {
                 const symbol = element.getAttribute('data-symbol');
+                if (!symbol) return;
+                
                 fetch(`/api/price/${symbol}`)
                     .then(response => response.json())
                     .then(data => {
-                        element.textContent = `${data.price}`;
+                        if (data && data.price !== undefined) {
+                            element.textContent = `$${data.price}`;
+                        }
                     })
-                    .catch(error => console.log('Price refresh failed:', error));
+                    .catch(error => {
+                        console.log(`Price refresh failed for ${symbol}:`, error);
+                    });
             });
         }
 
