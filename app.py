@@ -39,6 +39,18 @@ def create_app():
             user = User(username="admin", password="1234")
             db.session.add(user)
             db.session.commit()
+            print("✅ Admin user created successfully")
+        else:
+            print("✅ Admin user already exists")
+        
+        # Check if database tables are created
+        try:
+            portfolio_count = PortfolioStock.query.count()
+            print(f"✅ Database initialized. Current portfolio stocks: {portfolio_count}")
+        except Exception as e:
+            print(f"❌ Database error: {e}")
+            db.create_all()
+            print("✅ Database tables recreated")
 
     # Login manager setup
     login_manager = LoginManager(app)
@@ -54,9 +66,33 @@ def create_app():
         # Use cached data for better performance
         stocks = fetch_all_stocks()
         ticker_data = fetch_detailed_stocks(limit=5)  # Reduced from 10 to 5
-        news_list = fetch_general_news(limit=3)  # Reduced from 5 to 3
-        for news in news_list:
-            news['sector'] = 'general'
+        
+        # Fetch news from different sectors for better filtering
+        news_list = []
+        
+        # Get general market news
+        general_news = fetch_general_news(limit=5)  # Increased from 2 to 5
+        for news in general_news:
+            news['sector'] = 'General Market'
+            news['sentiment'] = analyze_sentiment(news.get('title', '') + ' ' + news.get('description', ''))
+        news_list.extend(general_news)
+        
+        # Get news from popular sectors
+        popular_sectors = ['Technology', 'Healthcare', 'Finance', 'Energy', 'Oil', 'Automobiles', 'Retail']
+        for sector in popular_sectors:
+            try:
+                sector_news = fetch_sector_news(sector, limit=3)  # Increased from 1 to 3
+                for news in sector_news:
+                    news['sector'] = sector
+                    news['sentiment'] = analyze_sentiment(news.get('title', '') + ' ' + news.get('description', ''))
+                news_list.extend(sector_news)
+            except Exception as e:
+                print(f"Error fetching news for sector {sector}: {e}")
+                continue
+        
+        # Limit total news to 20 articles
+        news_list = news_list[:20]
+        
         return render_template("home.html", stocks=stocks, news_list=news_list, ticker_data=ticker_data)
 
     @app.route("/dashboard")
@@ -230,29 +266,56 @@ def create_app():
     @login_required
     def add_stock():
         if request.method == "POST":
-            symbol = request.form.get("symbol", "").upper()
+            symbol = request.form.get("symbol", "").upper().strip()
             target_up = request.form.get("target_up")
             target_dn = request.form.get("target_dn")
             
-            if symbol:
-                # Check if stock already exists in portfolio
-                existing = PortfolioStock.query.filter_by(user_id=current_user.id, symbol=symbol).first()
-                if existing:
-                    flash(f"Stock {symbol} is already in your portfolio", "warning")
-                else:
-                    # Create new portfolio stock
-                    stock = PortfolioStock(
-                        user_id=current_user.id,
-                        symbol=symbol,
-                        target_up=float(target_up) if target_up else None,
-                        target_dn=float(target_dn) if target_dn else None
-                    )
-                    db.session.add(stock)
-                    db.session.commit()
-                    flash(f"Stock {symbol} added to portfolio successfully", "success")
-                    return redirect(url_for("dashboard"))
-            else:
+            print(f"🔍 Adding stock: {symbol}, target_up: {target_up}, target_dn: {target_dn}")
+            print(f"🔍 Current user: {current_user.username} (ID: {current_user.id})")
+            
+            if not symbol:
+                print("❌ No symbol provided")
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({"error": "Please enter a valid stock symbol"}), 400
                 flash("Please enter a valid stock symbol", "danger")
+                return render_template("add_stock.html")
+            
+            # Check if stock already exists in portfolio
+            existing = PortfolioStock.query.filter_by(user_id=current_user.id, symbol=symbol).first()
+            if existing:
+                print(f"❌ Stock {symbol} already exists in portfolio")
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({"error": f"Stock {symbol} is already in your portfolio"}), 400
+                flash(f"Stock {symbol} is already in your portfolio", "warning")
+                return render_template("add_stock.html")
+            
+            try:
+                # Create new portfolio stock
+                stock = PortfolioStock(
+                    user_id=current_user.id,
+                    symbol=symbol,
+                    target_up=float(target_up) if target_up else None,
+                    target_dn=float(target_dn) if target_dn else None
+                )
+                print(f"✅ Creating stock object: {stock.symbol}")
+                
+                db.session.add(stock)
+                db.session.commit()
+                print(f"✅ Stock {symbol} added to database successfully")
+                
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({"success": f"Stock {symbol} added to portfolio successfully"}), 200
+                
+                flash(f"Stock {symbol} added to portfolio successfully", "success")
+                return redirect(url_for("dashboard"))
+                
+            except Exception as e:
+                db.session.rollback()
+                print(f"❌ Error adding stock: {e}")
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({"error": "Failed to add stock. Please try again."}), 500
+                flash("Failed to add stock. Please try again.", "danger")
+                return render_template("add_stock.html")
         
         return render_template("add_stock.html")
 
@@ -306,6 +369,32 @@ def create_app():
             result.append({"date": date, "price": round(price, 2)})
         
         return jsonify(result)
+
+    @app.route("/test_db")
+    @login_required
+    def test_db():
+        try:
+            # Test database connection
+            user_count = User.query.count()
+            portfolio_count = PortfolioStock.query.count()
+            user_portfolio_count = PortfolioStock.query.filter_by(user_id=current_user.id).count()
+            
+            return jsonify({
+                "status": "success",
+                "message": "Database connection working",
+                "data": {
+                    "total_users": user_count,
+                    "total_portfolio_stocks": portfolio_count,
+                    "current_user_portfolio": user_portfolio_count,
+                    "current_user": current_user.username,
+                    "current_user_id": current_user.id
+                }
+            })
+        except Exception as e:
+            return jsonify({
+                "status": "error",
+                "message": f"Database error: {str(e)}"
+            }), 500
 
     return app
 

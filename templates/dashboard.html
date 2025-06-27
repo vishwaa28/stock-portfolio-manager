@@ -20,14 +20,26 @@
                         <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="alertCount" style="display: none;">
                             0
                         </span>
-                        <ul class="dropdown-menu dropdown-menu-end" id="alertDropdown" style="width: 350px; max-height: 400px; overflow-y: auto;">
-                            <li><h6 class="dropdown-header">Active Alerts</h6></li>
+                        <ul class="dropdown-menu dropdown-menu-end" id="alertDropdown" style="width: 400px; max-height: 500px; overflow-y: auto;">
+                            <li><h6 class="dropdown-header">Portfolio Alerts & Insights</h6></li>
                             <li><hr class="dropdown-divider"></li>
                             <li id="alertList">
                                 <span class="dropdown-item-text text-muted">No active alerts</span>
                             </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li id="portfolioSummary">
+                                <div class="dropdown-item">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small class="text-muted">Portfolio Summary</small>
+                                        <small class="text-muted" id="portfolioStats">Loading...</small>
+                                    </div>
+                                </div>
+                            </li>
                         </ul>
                     </div>
+                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addStockModal">
+                        <i class="fas fa-plus"></i> Add Stock
+                    </button>
                     <button class="btn btn-outline-primary" onclick="refreshDashboard()">
                         <i class="fas fa-sync-alt"></i> Refresh
                     </button>
@@ -183,7 +195,18 @@
         <div class="col-12 col-lg-4">
             <div class="card shadow-sm h-200">
                 <div class="card-body">
-                    <h5 class="mb-3 fw-semibold text-dark">Portfolio News</h5>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0 fw-semibold text-dark">Portfolio News</h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <select id="newsSectorFilter" class="form-select form-select-sm w-auto" style="min-width:160px;">
+                                <option value="all">All Sectors</option>
+                            </select>
+                            <button id="clearFilter" class="btn btn-sm btn-outline-secondary" style="display:none;">
+                                <i class="fas fa-times"></i> Clear
+                            </button>
+                        </div>
+                    </div>
+                    <div id="filterInfo" class="filter-info mb-2"></div>
                     <div id="portfolioNews" style="max-height: 60vh; overflow-y: auto;">
                         {% for row in table %}
                             {% for article in row.news[:3] %}
@@ -243,6 +266,80 @@
         </div>
     </div>
     {% endif %}
+</div>
+
+<!-- Add Stock Modal -->
+<div class="modal fade" id="addStockModal" tabindex="-1" aria-labelledby="addStockModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-primary text-white">
+                <h5 class="modal-title" id="addStockModalLabel">
+                    <i class="fas fa-plus-circle me-2"></i>Add Stock to Portfolio
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addStockForm">
+                    <div class="mb-3">
+                        <label for="stockSymbol" class="form-label fw-semibold">
+                            <i class="fas fa-chart-line me-2"></i>Stock Symbol
+                        </label>
+                        <input type="text" class="form-control" id="stockSymbol" name="symbol" 
+                               placeholder="e.g., AAPL, GOOGL, TSLA" required>
+                        <div class="form-text">Enter the stock symbol in uppercase letters</div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="targetUp" class="form-label fw-semibold">
+                                    <i class="fas fa-arrow-up text-success me-2"></i>Target Price (High)
+                                </label>
+                                <input type="number" class="form-control" id="targetUp" name="target_up" 
+                                       placeholder="e.g., 150.00" step="0.01" min="0">
+                                <div class="form-text">Optional</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="targetDn" class="form-label fw-semibold">
+                                    <i class="fas fa-arrow-down text-danger me-2"></i>Target Price (Low)
+                                </label>
+                                <input type="number" class="form-control" id="targetDn" name="target_dn" 
+                                       placeholder="e.g., 100.00" step="0.01" min="0">
+                                <div class="form-text">Optional</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Popular Stocks Quick Add -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            <i class="fas fa-star text-warning me-2"></i>Quick Add Popular Stocks
+                        </label>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="setStockSymbol('AAPL')">AAPL</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="setStockSymbol('GOOGL')">GOOGL</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="setStockSymbol('MSFT')">MSFT</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="setStockSymbol('TSLA')">TSLA</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="setStockSymbol('AMZN')">AMZN</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="setStockSymbol('META')">META</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="setStockSymbol('NVDA')">NVDA</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="setStockSymbol('NFLX')">NFLX</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Cancel
+                </button>
+                <button type="button" class="btn btn-success" onclick="addStockToPortfolio()">
+                    <i class="fas fa-plus me-2"></i>Add to Portfolio
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -371,6 +468,118 @@
     box-shadow: 0 4px 15px rgba(220, 53, 69, 0.2);
 }
 
+/* Enhanced Alert Styling */
+.alert-item[data-severity="high"] {
+    border-left-color: #dc3545;
+    background: linear-gradient(135deg, #fff5f5 0%, #ffe6e6 100%);
+}
+
+.alert-item[data-severity="medium"] {
+    border-left-color: #ffc107;
+    background: linear-gradient(135deg, #fffbf0 0%, #fff3cd 100%);
+}
+
+.alert-item[data-severity="low"] {
+    border-left-color: #17a2b8;
+    background: linear-gradient(135deg, #f0f9ff 0%, #e6f3ff 100%);
+}
+
+/* Category Headers */
+.dropdown-item-text.fw-semibold.text-primary {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 8px 0;
+    border-left: 3px solid var(--primary-color);
+}
+
+/* Portfolio Summary Styling */
+#portfolioSummary .dropdown-item {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 8px;
+    margin: 8px 0;
+    border: 1px solid #dee2e6;
+}
+
+#portfolioSummary .row {
+    margin: 0;
+}
+
+#portfolioSummary .col-4 {
+    padding: 8px 4px;
+}
+
+#portfolioSummary .fw-bold {
+    color: var(--primary-color);
+    font-size: 1.1rem;
+}
+
+/* Notification Icon Animation */
+@keyframes notificationPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+#notificationIcon.has-alerts {
+    animation: notificationPulse 2s infinite;
+    color: var(--warning-color) !important;
+}
+
+/* Alert Badge Styling */
+#alertCount {
+    font-size: 0.7rem;
+    font-weight: 600;
+    animation: notificationPulse 2s infinite;
+}
+
+/* Empty State Styling */
+.dropdown-item.text-center.py-3 {
+    background: linear-gradient(135deg, #f8fff9 0%, #e8f5e8 100%);
+    border-radius: 8px;
+    margin: 8px 0;
+    border: 1px solid #d4edda;
+}
+
+/* Performance Indicators */
+.text-success .fas {
+    color: #28a745;
+}
+
+.text-danger .fas {
+    color: #dc3545;
+}
+
+/* Enhanced Dropdown Styling */
+.dropdown-menu {
+    border: none;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    border-radius: 12px;
+    border: 1px solid #e9ecef;
+    backdrop-filter: blur(10px);
+}
+
+.dropdown-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    font-weight: 600;
+    border-radius: 12px 12px 0 0;
+    margin: -0.5rem -0.5rem 0.5rem -0.5rem;
+    padding: 1rem;
+    text-align: center;
+}
+
+.dropdown-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #28a745, #20c997, #17a2b8, #ffc107, #dc3545);
+    border-radius: 12px 12px 0 0;
+}
+
 /* Cards */
 .card {
     border: none;
@@ -451,8 +660,9 @@
 }
 
 .btn-outline-primary:hover {
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    background: rgba(102, 126, 234, 0.1);
     border-color: var(--primary-color);
+    color: var(--primary-color);
 }
 
 /* Notification Icon */
@@ -581,6 +791,289 @@
     border-color: var(--primary-color);
     color: var(--primary-color);
 }
+
+/* Modal Styling */
+.modal-content {
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow-hover);
+}
+
+.modal-header {
+    border: none;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+.modal-footer {
+    border: none;
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
+    padding: 1rem 1.5rem;
+}
+
+.bg-gradient-primary {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+}
+
+/* Success Button Styling */
+.btn-success {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    border: none;
+    color: white;
+    font-weight: 600;
+    transition: var(--transition);
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #218838, #1ea085);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+    color: white;
+}
+
+.card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    transform: translateY(-2px);
+}
+
+.table th {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    font-weight: 600;
+}
+
+.table td {
+    vertical-align: middle;
+    border-color: #f8f9fa;
+}
+
+.table tbody tr:hover {
+    background-color: #f8f9fa;
+    transform: scale(1.01);
+    transition: all 0.2s ease;
+}
+
+.sentiment-positive {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.sentiment-negative {
+    color: #dc3545;
+    font-weight: 600;
+}
+
+.sentiment-neutral {
+    color: #6c757d;
+    font-weight: 600;
+}
+
+.price-change-positive {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.price-change-negative {
+    color: #dc3545;
+    font-weight: 600;
+}
+
+.news-card {
+    transition: all 0.3s ease;
+    border: 1px solid #e9ecef;
+}
+
+.news-card:hover {
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+}
+
+.chart-container {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    margin-top: 20px;
+}
+
+.period-btn {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #6c757d;
+    transition: all 0.3s ease;
+}
+
+.period-btn:hover, .period-btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: #667eea;
+    color: white;
+}
+
+.notification-badge {
+    position: relative;
+    display: inline-block;
+}
+
+.notification-count {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.dropdown-menu {
+    border: none;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    border-radius: 12px;
+    padding: 0;
+    min-width: 350px;
+}
+
+.dropdown-item {
+    padding: 12px 20px;
+    border-bottom: 1px solid #f8f9fa;
+    transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.alert-section {
+    border-left: 4px solid #007bff;
+    padding-left: 15px;
+    margin-bottom: 15px;
+}
+
+.alert-section.negative {
+    border-left-color: #dc3545;
+}
+
+.alert-section.positive {
+    border-left-color: #28a745;
+}
+
+.alert-section.price {
+    border-left-color: #ffc107;
+}
+
+.severity-high {
+    color: #dc3545;
+    font-weight: 600;
+}
+
+.severity-medium {
+    color: #ffc107;
+    font-weight: 600;
+}
+
+.severity-low {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.portfolio-insights {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+.insight-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.insight-item:last-child {
+    margin-bottom: 0;
+}
+
+.insight-label {
+    font-weight: 500;
+}
+
+.insight-value {
+    font-weight: 600;
+}
+
+.modal-content {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px 12px 0 0;
+}
+
+.quick-add-btn {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #495057;
+    transition: all 0.3s ease;
+    margin: 2px;
+}
+
+.quick-add-btn:hover {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: #667eea;
+    color: white;
+    transform: translateY(-1px);
+}
+
+/* Sector filter styling */
+#newsSectorFilter {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+#newsSectorFilter:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+.news-card.hidden {
+    display: none !important;
+}
+
+.filter-info {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-top: 8px;
+}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -590,8 +1083,22 @@ let selectedStock = null;
 let currentPeriod = '1M';
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Collect all alerts from both news and table data
+    // Initialize sector filter for portfolio news
+    initializePortfolioSectorFilter();
+    
+    // Collect all alerts and insights
     let allAlerts = [];
+    let portfolioInsights = {
+        totalStocks: 0,
+        positiveSentiment: 0,
+        negativeSentiment: 0,
+        neutralSentiment: 0,
+        totalValue: 0,
+        priceAlerts: 0,
+        newsAlerts: 0,
+        topPerformers: [],
+        underPerformers: []
+    };
     
     // Get alerts from news items
     const newsItems = document.querySelectorAll('#portfolioNews [data-sentiment="negative"]');
@@ -599,63 +1106,219 @@ document.addEventListener('DOMContentLoaded', function() {
         const score = parseFloat(item.getAttribute('data-score'));
         const symbol = item.getAttribute('data-symbol');
         const sector = item.getAttribute('data-sector');
+        const title = item.querySelector('h6').textContent;
+        const source = item.querySelector('.text-muted small')?.textContent || 'Unknown';
+        
         if (score > 0.7) {
             allAlerts.push({
                 symbol: symbol,
                 sector: sector,
                 score: score,
-                title: item.querySelector('h6').textContent,
-                type: 'news'
+                title: title,
+                source: source,
+                type: 'news',
+                severity: 'high',
+                category: 'Negative News',
+                description: `High negative sentiment detected for ${symbol}`
             });
+            portfolioInsights.newsAlerts++;
         }
     });
     
-    // Get alerts from table data (price targets, etc.)
+    // Get alerts and insights from table data
     const tableRows = document.querySelectorAll('tbody tr');
     tableRows.forEach(row => {
+        const symbol = row.querySelector('td:first-child strong').textContent;
+        const priceCell = row.querySelector('.stock-price');
+        const changeCell = row.querySelector('td:nth-child(4)');
+        const sentimentCell = row.querySelector('td:nth-child(5) .badge');
         const alertCell = row.querySelector('td:last-child .badge');
+        
+        // Get price and change data
+        const price = parseFloat(priceCell?.textContent.replace('$', '') || '0');
+        const change = parseFloat(changeCell?.textContent || '0');
+        const sentiment = sentimentCell?.textContent || 'Neutral';
+        
+        // Add to portfolio insights
+        portfolioInsights.totalStocks++;
+        portfolioInsights.totalValue += price;
+        
+        if (sentiment.includes('Positive')) {
+            portfolioInsights.positiveSentiment++;
+        } else if (sentiment.includes('Negative')) {
+            portfolioInsights.negativeSentiment++;
+        } else {
+            portfolioInsights.neutralSentiment++;
+        }
+        
+        // Track performance
+        if (change > 0) {
+            portfolioInsights.topPerformers.push({ symbol, change, price });
+        } else if (change < 0) {
+            portfolioInsights.underPerformers.push({ symbol, change, price });
+        }
+        
+        // Check for price alerts
         if (alertCell && alertCell.textContent !== '-') {
-            const symbol = row.querySelector('td:first-child strong').textContent;
+            const alertCount = parseInt(alertCell.textContent);
+            portfolioInsights.priceAlerts += alertCount;
+            
+            // Add price target alerts
             allAlerts.push({
                 symbol: symbol,
                 sector: 'Portfolio',
                 score: 0.8,
-                title: `Alert for ${symbol}`,
-                type: 'portfolio'
+                title: `${symbol} has ${alertCount} active alert(s)`,
+                type: 'portfolio',
+                severity: 'medium',
+                category: 'Price Alert',
+                description: `Price targets or sentiment alerts triggered for ${symbol}`
+            });
+        }
+        
+        // Add significant price movement alerts
+        if (Math.abs(change) > 5) {
+            const direction = change > 0 ? 'gained' : 'lost';
+            allAlerts.push({
+                symbol: symbol,
+                sector: 'Portfolio',
+                score: 0.6,
+                title: `${symbol} ${direction} $${Math.abs(change).toFixed(2)} today`,
+                type: 'price_movement',
+                severity: 'medium',
+                category: 'Price Movement',
+                description: `Significant price movement detected for ${symbol}`
             });
         }
     });
     
-    // Update notification icon
+    // Sort performers
+    portfolioInsights.topPerformers.sort((a, b) => b.change - a.change);
+    portfolioInsights.underPerformers.sort((a, b) => a.change - b.change);
+    
+    // Update notification icon and content
     const notificationIcon = document.getElementById('notificationIcon');
     const alertCountBadge = document.getElementById('alertCount');
     const alertList = document.getElementById('alertList');
+    const portfolioStats = document.getElementById('portfolioStats');
     
     if (allAlerts.length > 0) {
         notificationIcon.classList.remove('text-muted');
-        notificationIcon.classList.add('text-warning');
+        notificationIcon.classList.add('text-warning', 'has-alerts');
         alertCountBadge.textContent = allAlerts.length;
         alertCountBadge.style.display = 'block';
         
-        // Populate alert dropdown
+        // Populate alert dropdown with categorized content
         alertList.innerHTML = '';
+        
+        // Group alerts by category
+        const alertsByCategory = {};
         allAlerts.forEach(alert => {
+            if (!alertsByCategory[alert.category]) {
+                alertsByCategory[alert.category] = [];
+            }
+            alertsByCategory[alert.category].push(alert);
+        });
+        
+        // Create categorized alert sections
+        Object.keys(alertsByCategory).forEach(category => {
+            const categoryAlerts = alertsByCategory[category];
+            
+            // Category header
+            const categoryHeader = document.createElement('div');
+            categoryHeader.className = 'dropdown-item-text fw-semibold text-primary small';
+            categoryHeader.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i>${category} (${categoryAlerts.length})`;
+            alertList.appendChild(categoryHeader);
+            
+            // Category alerts
+            categoryAlerts.forEach(alert => {
             const alertItem = document.createElement('div');
             alertItem.className = 'dropdown-item alert-item';
+                alertItem.setAttribute('data-severity', alert.severity);
+                
+                const severityIcon = alert.severity === 'high' ? 'fas fa-exclamation-circle text-danger' : 
+                                   alert.severity === 'medium' ? 'fas fa-exclamation-triangle text-warning' : 
+                                   'fas fa-info-circle text-info';
+                
             alertItem.innerHTML = `
+                    <div class="d-flex align-items-start">
+                        <div class="flex-shrink-0 me-2">
+                            <i class="${severityIcon}"></i>
+                        </div>
+                        <div class="flex-grow-1">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
-                        <strong>${alert.symbol}</strong> (${alert.sector})
-                        <br><small class="text-muted">${alert.title}</small>
+                                    <strong class="text-dark">${alert.symbol}</strong>
+                                    <span class="badge bg-secondary ms-1">${alert.sector}</span>
                     </div>
-                    <span class="badge bg-danger">${alert.score.toFixed(2)}</span>
+                                <span class="badge ${alert.severity === 'high' ? 'bg-danger' : alert.severity === 'medium' ? 'bg-warning' : 'bg-info'}">${alert.severity}</span>
+                            </div>
+                            <div class="text-dark small mt-1">${alert.title}</div>
+                            <div class="text-muted small mt-1">${alert.description}</div>
+                            ${alert.source ? `<div class="text-muted small"><i class="fas fa-newspaper me-1"></i>${alert.source}</div>` : ''}
+                        </div>
                 </div>
             `;
             alertList.appendChild(alertItem);
+            });
+            
+            // Add separator between categories
+            if (Object.keys(alertsByCategory).indexOf(category) < Object.keys(alertsByCategory).length - 1) {
+                const separator = document.createElement('hr');
+                separator.className = 'dropdown-divider';
+                alertList.appendChild(separator);
+            }
         });
     } else {
-        alertList.innerHTML = '<span class="dropdown-item-text text-muted">No active alerts</span>';
+        alertList.innerHTML = `
+            <div class="dropdown-item text-center py-3">
+                <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                <p class="text-muted mb-0">No active alerts</p>
+                <small class="text-muted">Your portfolio is performing well!</small>
+            </div>
+        `;
     }
+    
+    // Update portfolio summary
+    const totalAlerts = portfolioInsights.priceAlerts + portfolioInsights.newsAlerts;
+    const portfolioHealth = portfolioInsights.positiveSentiment > portfolioInsights.negativeSentiment ? 'Good' : 
+                           portfolioInsights.negativeSentiment > portfolioInsights.positiveSentiment ? 'Needs Attention' : 'Stable';
+    
+    portfolioStats.innerHTML = `
+        <span class="badge ${portfolioHealth === 'Good' ? 'bg-success' : portfolioHealth === 'Needs Attention' ? 'bg-warning' : 'bg-info'}">${portfolioHealth}</span>
+    `;
+    
+    // Add portfolio insights section
+    const insightsSection = document.createElement('div');
+    insightsSection.className = 'dropdown-item';
+    insightsSection.innerHTML = `
+        <div class="row g-2 text-center">
+            <div class="col-4">
+                <div class="small text-muted">Stocks</div>
+                <div class="fw-bold">${portfolioInsights.totalStocks}</div>
+            </div>
+            <div class="col-4">
+                <div class="small text-muted">Value</div>
+                <div class="fw-bold">$${portfolioInsights.totalValue.toFixed(0)}</div>
+            </div>
+            <div class="col-4">
+                <div class="small text-muted">Alerts</div>
+                <div class="fw-bold">${totalAlerts}</div>
+            </div>
+        </div>
+        ${portfolioInsights.topPerformers.length > 0 ? `
+            <div class="mt-2">
+                <small class="text-success"><i class="fas fa-arrow-up me-1"></i>Top: ${portfolioInsights.topPerformers[0].symbol} (+$${portfolioInsights.topPerformers[0].change.toFixed(2)})</small>
+            </div>
+        ` : ''}
+        ${portfolioInsights.underPerformers.length > 0 ? `
+            <div class="mt-1">
+                <small class="text-danger"><i class="fas fa-arrow-down me-1"></i>Worst: ${portfolioInsights.underPerformers[0].symbol} ($${portfolioInsights.underPerformers[0].change.toFixed(2)})</small>
+            </div>
+        ` : ''}
+    `;
+    
+    document.getElementById('portfolioSummary').appendChild(insightsSection);
 
     // Stock row click handlers
     const stockRows = document.querySelectorAll('.stock-row');
@@ -676,6 +1339,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    // Performance monitoring
+    const startTime = performance.now();
 });
 
 function selectStock(symbol, rowElement) {
@@ -853,8 +1519,208 @@ function showChartError(message) {
     chartPlaceholder.style.display = 'block';
 }
 
+// Add Stock Functions
+function setStockSymbol(symbol) {
+    document.getElementById('stockSymbol').value = symbol;
+    document.getElementById('stockSymbol').focus();
+}
+
+function addStockToPortfolio() {
+    const symbol = document.getElementById('stockSymbol').value.trim().toUpperCase();
+    const targetUp = document.getElementById('targetUp').value;
+    const targetDn = document.getElementById('targetDn').value;
+    
+    if (!symbol) {
+        showModalAlert('Please enter a stock symbol', 'danger');
+        return;
+    }
+    
+    // Show loading state
+    const addButton = document.querySelector('#addStockModal .btn-success');
+    const originalText = addButton.innerHTML;
+    addButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Adding...';
+    addButton.disabled = true;
+    
+    // Prepare form data
+    const formData = new FormData();
+    formData.append('symbol', symbol);
+    if (targetUp) formData.append('target_up', targetUp);
+    if (targetDn) formData.append('target_dn', targetDn);
+    
+    // Send request to add stock
+    fetch('/add_stock', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        if (response.redirected) {
+            // If redirected, it means success
+            showModalAlert('Stock added successfully!', 'success');
+            setTimeout(() => {
+                window.location.href = response.url;
+            }, 1500);
+            return null;
+        } else {
+            return response.json();
+        }
+    })
+    .then(data => {
+        if (data) {
+            if (data.success) {
+                showModalAlert(data.success, 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else if (data.error) {
+                showModalAlert(data.error, 'danger');
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error adding stock:', error);
+        showModalAlert('Failed to add stock. Please try again.', 'danger');
+    })
+    .finally(() => {
+        // Reset button state
+        addButton.innerHTML = originalText;
+        addButton.disabled = false;
+    });
+}
+
+function showModalAlert(message, type) {
+    // Remove existing alerts
+    const existingAlert = document.querySelector('#addStockModal .alert');
+    if (existingAlert) {
+        existingAlert.remove();
+    }
+    
+    // Create new alert
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    // Insert alert at the top of modal body
+    const modalBody = document.querySelector('#addStockModal .modal-body');
+    modalBody.insertBefore(alertDiv, modalBody.firstChild);
+    
+    // Auto-dismiss success alerts after 3 seconds
+    if (type === 'success') {
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 3000);
+    }
+}
+
+// Clear form when modal is closed
+document.addEventListener('DOMContentLoaded', function() {
+    const addStockModal = document.getElementById('addStockModal');
+    addStockModal.addEventListener('hidden.bs.modal', function() {
+        document.getElementById('addStockForm').reset();
+        // Remove any existing alerts
+        const existingAlert = document.querySelector('#addStockModal .alert');
+        if (existingAlert) {
+            existingAlert.remove();
+        }
+    });
+});
+
 function refreshDashboard() {
     location.reload();
+}
+
+// Portfolio News Sector Filter Functions
+function initializePortfolioSectorFilter() {
+    const sectorFilter = document.getElementById('newsSectorFilter');
+    const newsCards = document.querySelectorAll('.news-card');
+    const sectors = new Set();
+    
+    // Collect all unique sectors from news cards
+    newsCards.forEach(card => {
+        const sector = card.dataset.sector;
+        if (sector && sector !== 'Unknown') {
+            sectors.add(sector);
+        }
+    });
+    
+    // Populate dropdown with sectors
+    sectors.forEach(sector => {
+        const option = document.createElement('option');
+        option.value = sector;
+        option.textContent = sector;
+        sectorFilter.appendChild(option);
+    });
+    
+    // Add event listener for sector filter
+    sectorFilter.addEventListener('change', filterPortfolioNewsBySector);
+    
+    // Add event listener for clear filter button
+    const clearFilterBtn = document.getElementById('clearFilter');
+    if (clearFilterBtn) {
+        clearFilterBtn.addEventListener('click', clearPortfolioFilter);
+    }
+    
+    // Initialize filter info
+    setTimeout(() => {
+        filterPortfolioNewsBySector();
+    }, 100);
+}
+
+function filterPortfolioNewsBySector() {
+    const selectedSector = document.getElementById('newsSectorFilter').value;
+    const newsCards = document.querySelectorAll('.news-card');
+    const clearFilterBtn = document.getElementById('clearFilter');
+    let visibleCount = 0;
+    
+    newsCards.forEach(card => {
+        const cardSector = card.dataset.sector;
+        if (selectedSector === 'all' || cardSector === selectedSector) {
+            card.style.display = 'block';
+            card.classList.remove('hidden');
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+            card.classList.add('hidden');
+        }
+    });
+    
+    // Show/hide clear filter button
+    if (selectedSector === 'all') {
+        clearFilterBtn.style.display = 'none';
+    } else {
+        clearFilterBtn.style.display = 'inline-block';
+    }
+    
+    // Update filter info
+    updatePortfolioFilterInfo(selectedSector, visibleCount, newsCards.length);
+}
+
+function clearPortfolioFilter() {
+    document.getElementById('newsSectorFilter').value = 'all';
+    filterPortfolioNewsBySector();
+}
+
+function updatePortfolioFilterInfo(selectedSector, visibleCount, totalCount) {
+    let filterInfo = document.getElementById('filterInfo');
+    if (!filterInfo) {
+        filterInfo = document.createElement('div');
+        filterInfo.id = 'filterInfo';
+        filterInfo.className = 'filter-info';
+        document.getElementById('portfolioNews').insertAdjacentElement('beforebegin', filterInfo);
+    }
+    
+    if (selectedSector === 'all') {
+        filterInfo.textContent = `Showing all ${totalCount} news articles`;
+    } else {
+        filterInfo.textContent = `Showing ${visibleCount} of ${totalCount} articles for ${selectedSector}`;
+    }
 }
 </script>
 
