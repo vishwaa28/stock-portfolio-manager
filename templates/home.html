@@ -9,7 +9,7 @@
             {% for stock in ticker_data %}
             <div class="ticker-item {{ 'up' if stock.change > 0 else 'down' if stock.change < 0 else 'neutral' }}">
                 <span class="symbol">{{ stock.symbol }}</span>
-                <span class="price">${{ "%.2f"|format(stock.price) }}</span>
+                <span class="price stock-price" data-symbol="{{ stock.symbol }}">${{ "%.2f"|format(stock.price) }}</span>
             </div>
             {% endfor %}
         {% endfor %}
@@ -144,7 +144,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 tr.innerHTML = `
                     <td><strong>${stock.symbol}</strong></td>
                     <td><small class="text-muted">${stock.name}</small></td>
-                    <td>$${stock.price !== null ? stock.price.toFixed(2) : 'N/A'}</td>
+                    <td class="stock-price" data-symbol="${stock.symbol}">$${stock.price !== null ? stock.price.toFixed(2) : 'N/A'}</td>
                     <td class="${stock.change > 0 ? 'text-success' : stock.change < 0 ? 'text-danger' : ''}">${stock.change !== null ? stock.change.toFixed(2) : 'N/A'}</td>
                     <td>${stock.sector}</td>
                     <td>${stock.market_cap !== null && stock.market_cap !== undefined ? stock.market_cap : 'N/A'}</td>
