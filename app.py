@@ -121,8 +121,20 @@ def create_app():
             # Calculate price change
             previous_close = fetch_previous_close(stock.symbol)
             change = 0
+            days_gain_pct = None
+            overall_gain_pct = None
+            
             if previous_close and price:
                 change = price - previous_close
+                days_gain_pct = ((price - previous_close) / previous_close) * 100 if previous_close else None
+            
+            # Calculate overall gain percentage if purchase price is available
+            if stock.purchase_price and price:
+                overall_gain_pct = ((price - stock.purchase_price) / stock.purchase_price) * 100 if stock.purchase_price else None
+            
+            # Calculate total value for this stock (price * quantity)
+            stock_total_value = price * stock.quantity if price else 0
+            total_value += stock_total_value
             
             # Only fetch sector news if we have a valid sector and it's not "Unknown"
             sector_news = []
@@ -184,8 +196,6 @@ def create_app():
                 sentiment_text = "➖ Neutral"
                 overall_sentiment["neutral"] += 1
 
-            total_value += price
-
             # Combine stock news and sector news
             all_news = news + sector_news
 
@@ -193,7 +203,11 @@ def create_app():
                 "symbol": stock.symbol,
                 "name": profile.get("name", stock.symbol) if profile else stock.symbol,
                 "price": price,
+                "quantity": stock.quantity,
+                "total_value": stock_total_value,
                 "change": change,
+                "days_gain_pct": days_gain_pct,
+                "overall_gain_pct": overall_gain_pct,
                 "news": all_news,
                 "alerts": alerts,
                 "sentiment_class": sentiment_class,
@@ -267,10 +281,12 @@ def create_app():
     def add_stock():
         if request.method == "POST":
             symbol = request.form.get("symbol", "").upper().strip()
+            quantity = request.form.get("quantity", "1")
+            purchase_price = request.form.get("purchase_price")
             target_up = request.form.get("target_up")
             target_dn = request.form.get("target_dn")
             
-            print(f"🔍 Adding stock: {symbol}, target_up: {target_up}, target_dn: {target_dn}")
+            print(f"🔍 Adding stock: {symbol}, quantity: {quantity}, purchase_price: {purchase_price}, target_up: {target_up}, target_dn: {target_dn}")
             print(f"🔍 Current user: {current_user.username} (ID: {current_user.id})")
             
             if not symbol:
@@ -290,14 +306,30 @@ def create_app():
                 return render_template("add_stock.html")
             
             try:
+                # Convert quantity to integer, default to 1 if invalid
+                try:
+                    quantity = int(quantity)
+                    if quantity <= 0:
+                        quantity = 1
+                except (ValueError, TypeError):
+                    quantity = 1
+                
+                # Convert purchase_price to float, default to current price if not provided
+                try:
+                    purchase_price = float(purchase_price)
+                except (ValueError, TypeError):
+                    purchase_price = fetch_price(symbol)
+                
                 # Create new portfolio stock
                 stock = PortfolioStock(
                     user_id=current_user.id,
                     symbol=symbol,
+                    quantity=quantity,
+                    purchase_price=purchase_price,
                     target_up=float(target_up) if target_up else None,
                     target_dn=float(target_dn) if target_dn else None
                 )
-                print(f"✅ Creating stock object: {stock.symbol}")
+                print(f"✅ Creating stock object: {stock.symbol} with quantity {stock.quantity} at purchase price {stock.purchase_price}")
                 
                 db.session.add(stock)
                 db.session.commit()

@@ -14,6 +14,8 @@ class User(db.Model, UserMixin):
 class PortfolioStock(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     symbol = db.Column(db.String(10), nullable=False)
+    quantity = db.Column(db.Integer, default=1)  # Number of shares owned
+    purchase_price = db.Column(db.Float, default=0)  # Average purchase price per share
     target_up = db.Column(db.Float)
     target_dn = db.Column(db.Float)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
