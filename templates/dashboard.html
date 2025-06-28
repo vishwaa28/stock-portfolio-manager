@@ -43,6 +43,9 @@
                     <button class="btn btn-outline-primary" onclick="refreshDashboard()">
                         <i class="fas fa-sync-alt"></i> Refresh
                     </button>
+                    <button class="btn btn-outline-warning" onclick="testNotification()">
+                        <i class="fas fa-bell"></i> Test Alert
+                    </button>
                 </div>
             </div>
         </div>
@@ -110,6 +113,10 @@
                                     <th>Symbol</th>
                                     <th>Name</th>
                                     <th>Price</th>
+                                    <th>Quantity</th>
+                                    <th>Total Value</th>
+                                    <th>Day's Gain %</th>
+                                    <th>Overall Gain %</th>
                                     <th>Change</th>
                                     <th>Sentiment</th>
                                     <th>Score</th>
@@ -122,6 +129,10 @@
                                     <td><strong>{{ row.symbol }}</strong></td>
                                     <td><small class="text-muted">{{ row.name|default('N/A') }}</small></td>
                                     <td class="stock-price" data-symbol="{{ row.symbol }}">${{ "%.2f"|format(row.price) }}</td>
+                                    <td>{{ row.quantity }}</td>
+                                    <td>${{ "%.2f"|format(row.total_value) }}</td>
+                                    <td>{% if row.days_gain_pct is not none %}{{ "%.2f"|format(row.days_gain_pct) }}%{% else %}-{% endif %}</td>
+                                    <td>{% if row.overall_gain_pct is not none %}{{ "%.2f"|format(row.overall_gain_pct) }}%{% else %}-{% endif %}</td>
                                     <td class="{% if row.change > 0 %}text-success{% elif row.change < 0 %}text-danger{% endif %}">
                                         {{ "%.2f"|format(row.change|default(0)) }}
                                     </td>
@@ -191,26 +202,34 @@
             </div>
         </div>
 
-        <!-- Right Side: Portfolio News -->
+        <!-- Right Side: Portfolio News - Full Height -->
         <div class="col-12 col-lg-4">
-            <div class="card shadow-sm h-200">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="mb-0 fw-semibold text-dark">Portfolio News</h5>
-                        <div class="d-flex align-items-center gap-2">
-                            <select id="newsSectorFilter" class="form-select form-select-sm w-auto" style="min-width:160px;">
-                                <option value="all">All Sectors</option>
-                            </select>
-                            <button id="clearFilter" class="btn btn-sm btn-outline-secondary" style="display:none;">
-                                <i class="fas fa-times"></i> Clear
-                            </button>
+            <div class="card shadow-sm" style="height: fit-content; max-height: calc(100vh - 200px);">
+                <div class="card-body d-flex flex-column h-100 p-0">
+                    <div class="p-3 border-bottom">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0 fw-semibold text-dark">
+                                <span id="newsTitle">Portfolio News</span>
+                                <span id="selectedStockInfo" class="text-primary ms-2" style="display: none;"></span>
+                            </h5>
+                            <div class="d-flex align-items-center gap-2">
+                                <button id="clearStockFilter" class="btn btn-sm btn-outline-secondary" style="display:none;">
+                                    <i class="fas fa-times"></i> Show All
+                                </button>
+                                <select id="newsSectorFilter" class="form-select form-select-sm w-auto" style="min-width:160px;">
+                                    <option value="all">All Sectors</option>
+                                </select>
+                                <button id="clearFilter" class="btn btn-sm btn-outline-secondary" style="display:none;">
+                                    <i class="fas fa-times"></i> Clear
+                                </button>
+                            </div>
                         </div>
+                        <div id="filterInfo" class="filter-info mb-2"></div>
                     </div>
-                    <div id="filterInfo" class="filter-info mb-2"></div>
-                    <div id="portfolioNews" style="max-height: 60vh; overflow-y: auto;">
+                    <div id="portfolioNews" class="flex-grow-1" style="overflow-y: auto; max-height: calc(100vh - 350px);">
                         {% for row in table %}
                             {% for article in row.news[:3] %}
-                            <div class="mb-3 p-3 border rounded news-card" data-sentiment="{{ article.sentiment }}" data-score="{{ article.sentiment_score|default(0.5) }}" data-sector="{{ article.sector|default('Unknown') }}" data-symbol="{{ article.symbol|default(row.symbol) }}">
+                            <div class="py-3 px-3 border-bottom news-card" data-sentiment="{{ article.sentiment }}" data-score="{{ article.sentiment_score|default(0.5) }}" data-sector="{{ article.sector|default('Unknown') }}" data-symbol="{{ article.symbol|default(row.symbol) }}">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
                                     <h6 class="mb-1 fw-medium text-dark">{{ article.title[:70] }}{% if article.title|length > 70 %}...{% endif %}</h6>
                                     <span class="badge {% if article.sentiment == 'negative' and article.sentiment_score|default(0.5) > 0.7 %}bg-danger{% elif article.sentiment == 'positive' %}bg-success{% else %}bg-secondary{% endif %}">
@@ -292,22 +311,22 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="targetUp" class="form-label fw-semibold">
-                                    <i class="fas fa-arrow-up text-success me-2"></i>Target Price (High)
+                                <label for="stockQuantity" class="form-label fw-semibold">
+                                    <i class="fas fa-layer-group me-2"></i>Quantity
                                 </label>
-                                <input type="number" class="form-control" id="targetUp" name="target_up" 
-                                       placeholder="e.g., 150.00" step="0.01" min="0">
-                                <div class="form-text">Optional</div>
+                                <input type="number" class="form-control" id="stockQuantity" name="quantity" 
+                                       placeholder="e.g., 10" value="1" min="1" required>
+                                <div class="form-text">Number of shares</div>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="targetDn" class="form-label fw-semibold">
-                                    <i class="fas fa-arrow-down text-danger me-2"></i>Target Price (Low)
+                                <label for="purchasePrice" class="form-label fw-semibold">
+                                    <i class="fas fa-dollar-sign me-2"></i>Purchase Price
                                 </label>
-                                <input type="number" class="form-control" id="targetDn" name="target_dn" 
-                                       placeholder="e.g., 100.00" step="0.01" min="0">
-                                <div class="form-text">Optional</div>
+                                <input type="number" class="form-control" id="purchasePrice" name="purchase_price" 
+                                       placeholder="e.g., 150.00" step="0.01" min="0">
+                                <div class="form-text">Average price per share (optional)</div>
                             </div>
                         </div>
                     </div>
@@ -717,17 +736,17 @@
 }
 
 #portfolioNews::-webkit-scrollbar-track {
-    background: #f1f1f1;
+    background: #f8f9fa;
     border-radius: 3px;
 }
 
 #portfolioNews::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    background: #dee2e6;
     border-radius: 3px;
 }
 
 #portfolioNews::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, #5a6fd8, #6a4c93);
+    background: #adb5bd;
 }
 
 /* Chart Styling */
@@ -887,12 +906,16 @@
 
 .news-card {
     transition: all 0.3s ease;
-    border: 1px solid #e9ecef;
+    background: white;
 }
 
 .news-card:hover {
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    transform: translateY(-2px);
+    background: #f8f9fa;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.news-card:last-child {
+    border-bottom: none !important;
 }
 
 .chart-container {
@@ -1074,6 +1097,45 @@
     color: #6c757d;
     margin-top: 8px;
 }
+
+/* Portfolio News Scrollbar Styling */
+#portfolioNews {
+    scrollbar-width: thin;
+    scrollbar-color: #dee2e6 #f8f9fa;
+}
+
+#portfolioNews::-webkit-scrollbar {
+    width: 6px;
+}
+
+#portfolioNews::-webkit-scrollbar-track {
+    background: #f8f9fa;
+    border-radius: 3px;
+}
+
+#portfolioNews::-webkit-scrollbar-thumb {
+    background: #dee2e6;
+    border-radius: 3px;
+}
+
+#portfolioNews::-webkit-scrollbar-thumb:hover {
+    background: #adb5bd;
+}
+
+/* News card styling for dashboard */
+.news-card {
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.news-card:hover {
+    background: #f8f9fa;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.news-card:last-child {
+    border-bottom: none !important;
+}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -1086,203 +1148,216 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize sector filter for portfolio news
     initializePortfolioSectorFilter();
     
-    // Collect all alerts and insights
+    // Set portfolio news height to match left side content
+    setPortfolioNewsHeight();
+    
+    // Get stock rows first
+    const stockRowElements = document.querySelectorAll('.stock-row');
+    
+    // Simple alert detection
     let allAlerts = [];
-    let portfolioInsights = {
-        totalStocks: 0,
-        positiveSentiment: 0,
-        negativeSentiment: 0,
-        neutralSentiment: 0,
-        totalValue: 0,
-        priceAlerts: 0,
-        newsAlerts: 0,
-        topPerformers: [],
-        underPerformers: []
-    };
+    let totalAlerts = 0;
     
-    // Get alerts from news items
-    const newsItems = document.querySelectorAll('#portfolioNews [data-sentiment="negative"]');
-    newsItems.forEach(item => {
-        const score = parseFloat(item.getAttribute('data-score'));
-        const symbol = item.getAttribute('data-symbol');
-        const sector = item.getAttribute('data-sector');
-        const title = item.querySelector('h6').textContent;
-        const source = item.querySelector('.text-muted small')?.textContent || 'Unknown';
+    // Add a test alert to ensure the system works (remove this later)
+    allAlerts.push({
+        symbol: 'TEST',
+        title: 'Test alert - system is working',
+        severity: 'medium',
+        type: 'test'
+    });
+    totalAlerts++;
+    
+    // Force test - always show at least 1 alert for testing
+    if (totalAlerts === 0) {
+        allAlerts.push({
+            symbol: 'FORCE',
+            title: 'Forced test alert - system check',
+            severity: 'medium',
+            type: 'test'
+        });
+        totalAlerts = 1;
+    }
+    
+    // Check for negative sentiment in news
+    const negativeNews = document.querySelectorAll('.news-card[data-sentiment="negative"]');
+    negativeNews.forEach(news => {
+        const symbol = news.dataset.symbol;
+        const score = parseFloat(news.dataset.score);
+        const title = news.querySelector('h6').textContent;
         
-        if (score > 0.7) {
+        if (score > 0.6) { // High negative sentiment
             allAlerts.push({
                 symbol: symbol,
-                sector: sector,
-                score: score,
-                title: title,
-                source: source,
-                type: 'news',
+                title: `Negative news: ${title.substring(0, 50)}...`,
                 severity: 'high',
-                category: 'Negative News',
-                description: `High negative sentiment detected for ${symbol}`
+                type: 'news'
             });
-            portfolioInsights.newsAlerts++;
+            totalAlerts++;
         }
     });
     
-    // Get alerts and insights from table data
-    const tableRows = document.querySelectorAll('tbody tr');
-    tableRows.forEach(row => {
+    // Check for alerts in portfolio stocks (from backend alerts array)
+    stockRowElements.forEach(row => {
         const symbol = row.querySelector('td:first-child strong').textContent;
-        const priceCell = row.querySelector('.stock-price');
-        const changeCell = row.querySelector('td:nth-child(4)');
-        const sentimentCell = row.querySelector('td:nth-child(5) .badge');
-        const alertCell = row.querySelector('td:last-child .badge');
+        const alertsCell = row.querySelector('td:nth-child(9)');
         
-        // Get price and change data
-        const price = parseFloat(priceCell?.textContent.replace('$', '') || '0');
-        const change = parseFloat(changeCell?.textContent || '0');
-        const sentiment = sentimentCell?.textContent || 'Neutral';
+        console.log(`Checking alerts for ${symbol}:`, {
+            alertsCell: alertsCell,
+            alertsCellHTML: alertsCell ? alertsCell.innerHTML : 'null'
+        });
         
-        // Add to portfolio insights
-        portfolioInsights.totalStocks++;
-        portfolioInsights.totalValue += price;
-        
-        if (sentiment.includes('Positive')) {
-            portfolioInsights.positiveSentiment++;
-        } else if (sentiment.includes('Negative')) {
-            portfolioInsights.negativeSentiment++;
-        } else {
-            portfolioInsights.neutralSentiment++;
-        }
-        
-        // Track performance
-        if (change > 0) {
-            portfolioInsights.topPerformers.push({ symbol, change, price });
-        } else if (change < 0) {
-            portfolioInsights.underPerformers.push({ symbol, change, price });
-        }
-        
-        // Check for price alerts
-        if (alertCell && alertCell.textContent !== '-') {
-            const alertCount = parseInt(alertCell.textContent);
-            portfolioInsights.priceAlerts += alertCount;
+        // Check if there are any alerts displayed in the alerts column
+        if (alertsCell) {
+            const alertBadge = alertsCell.querySelector('.badge');
+            console.log(`Alert badge for ${symbol}:`, {
+                alertBadge: alertBadge,
+                badgeText: alertBadge ? alertBadge.textContent : 'null'
+            });
             
-            // Add price target alerts
-            allAlerts.push({
-                symbol: symbol,
-                sector: 'Portfolio',
-                score: 0.8,
-                title: `${symbol} has ${alertCount} active alert(s)`,
-                type: 'portfolio',
-                severity: 'medium',
-                category: 'Price Alert',
-                description: `Price targets or sentiment alerts triggered for ${symbol}`
-            });
+            if (alertBadge && alertBadge.textContent !== '-') {
+                const alertCount = parseInt(alertBadge.textContent);
+                console.log(`Alert count for ${symbol}:`, alertCount);
+                if (alertCount > 0) {
+                    allAlerts.push({
+                        symbol: symbol,
+                        title: `${symbol} has ${alertCount} alert(s)`,
+                        severity: 'medium',
+                        type: 'portfolio'
+                    });
+                    totalAlerts += alertCount;
+                    console.log(`Added portfolio alert for ${symbol}, total alerts now:`, totalAlerts);
+                }
+            }
         }
         
-        // Add significant price movement alerts
-        if (Math.abs(change) > 5) {
-            const direction = change > 0 ? 'gained' : 'lost';
-            allAlerts.push({
-                symbol: symbol,
-                sector: 'Portfolio',
-                score: 0.6,
-                title: `${symbol} ${direction} $${Math.abs(change).toFixed(2)} today`,
-                type: 'price_movement',
-                severity: 'medium',
-                category: 'Price Movement',
-                description: `Significant price movement detected for ${symbol}`
-            });
+        // Check for negative sentiment
+        const sentimentCell = row.querySelector('td:nth-child(7) .badge');
+        const sentimentScoreCell = row.querySelector('td:nth-child(8) .badge');
+        
+        console.log(`Sentiment check for ${symbol}:`, {
+            sentimentCell: sentimentCell ? sentimentCell.textContent : 'null',
+            sentimentScoreCell: sentimentScoreCell ? sentimentScoreCell.textContent : 'null'
+        });
+        
+        if (sentimentCell && sentimentScoreCell) {
+            const sentiment = sentimentCell.textContent;
+            const sentimentScore = parseFloat(sentimentScoreCell.textContent);
+            
+            if (sentiment.includes('Negative') || sentimentScore < 0.4) {
+                allAlerts.push({
+                    symbol: symbol,
+                    title: `${symbol} showing negative sentiment`,
+                    severity: sentimentScore < 0.3 ? 'high' : 'medium',
+                    type: 'sentiment'
+                });
+                totalAlerts++;
+                console.log(`Added sentiment alert for ${symbol}, total alerts now:`, totalAlerts);
+            }
         }
     });
     
-    // Sort performers
-    portfolioInsights.topPerformers.sort((a, b) => b.change - a.change);
-    portfolioInsights.underPerformers.sort((a, b) => a.change - b.change);
-    
-    // Update notification icon and content
+    // Update notification icon
     const notificationIcon = document.getElementById('notificationIcon');
     const alertCountBadge = document.getElementById('alertCount');
     const alertList = document.getElementById('alertList');
-    const portfolioStats = document.getElementById('portfolioStats');
     
-    if (allAlerts.length > 0) {
-        notificationIcon.classList.remove('text-muted');
-        notificationIcon.classList.add('text-warning', 'has-alerts');
-        alertCountBadge.textContent = allAlerts.length;
-        alertCountBadge.style.display = 'block';
+    console.log('DOM elements found:', {
+        notificationIcon: notificationIcon,
+        alertCountBadge: alertCountBadge,
+        alertList: alertList
+    });
+    
+    console.log('Alert detection results:', {
+        totalAlerts: totalAlerts,
+        allAlerts: allAlerts,
+        negativeNewsCount: document.querySelectorAll('.news-card[data-sentiment="negative"]').length,
+        stockRowsCount: stockRowElements.length
+    });
+    
+    if (totalAlerts > 0) {
+        // Show notification badge
+        console.log('Attempting to show notification badge with', totalAlerts, 'alerts');
         
-        // Populate alert dropdown with categorized content
-        alertList.innerHTML = '';
+        if (notificationIcon) {
+            notificationIcon.classList.remove('text-muted');
+            notificationIcon.classList.add('text-warning', 'has-alerts');
+            console.log('Updated notification icon classes');
+        } else {
+            console.error('Notification icon not found!');
+        }
         
-        // Group alerts by category
-        const alertsByCategory = {};
-        allAlerts.forEach(alert => {
-            if (!alertsByCategory[alert.category]) {
-                alertsByCategory[alert.category] = [];
-            }
-            alertsByCategory[alert.category].push(alert);
-        });
+        if (alertCountBadge) {
+            alertCountBadge.textContent = totalAlerts;
+            alertCountBadge.style.display = 'block';
+            console.log('Updated alert count badge');
+        } else {
+            console.error('Alert count badge not found!');
+        }
         
-        // Create categorized alert sections
-        Object.keys(alertsByCategory).forEach(category => {
-            const categoryAlerts = alertsByCategory[category];
+        console.log('Showing alerts:', totalAlerts);
+        
+        // Populate alert dropdown
+        if (alertList) {
+            alertList.innerHTML = '';
             
-            // Category header
-            const categoryHeader = document.createElement('div');
-            categoryHeader.className = 'dropdown-item-text fw-semibold text-primary small';
-            categoryHeader.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i>${category} (${categoryAlerts.length})`;
-            alertList.appendChild(categoryHeader);
-            
-            // Category alerts
-            categoryAlerts.forEach(alert => {
-            const alertItem = document.createElement('div');
-            alertItem.className = 'dropdown-item alert-item';
+            allAlerts.forEach(alert => {
+                const alertItem = document.createElement('div');
+                alertItem.className = 'dropdown-item alert-item';
                 alertItem.setAttribute('data-severity', alert.severity);
                 
                 const severityIcon = alert.severity === 'high' ? 'fas fa-exclamation-circle text-danger' : 
-                                   alert.severity === 'medium' ? 'fas fa-exclamation-triangle text-warning' : 
-                                   'fas fa-info-circle text-info';
+                                   'fas fa-exclamation-triangle text-warning';
                 
-            alertItem.innerHTML = `
+                alertItem.innerHTML = `
                     <div class="d-flex align-items-start">
                         <div class="flex-shrink-0 me-2">
                             <i class="${severityIcon}"></i>
                         </div>
                         <div class="flex-grow-1">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
                                     <strong class="text-dark">${alert.symbol}</strong>
-                                    <span class="badge bg-secondary ms-1">${alert.sector}</span>
-                    </div>
-                                <span class="badge ${alert.severity === 'high' ? 'bg-danger' : alert.severity === 'medium' ? 'bg-warning' : 'bg-info'}">${alert.severity}</span>
+                                    <span class="badge bg-secondary ms-1">${alert.type}</span>
+                                </div>
+                                <span class="badge ${alert.severity === 'high' ? 'bg-danger' : 'bg-warning'}">${alert.severity}</span>
                             </div>
                             <div class="text-dark small mt-1">${alert.title}</div>
-                            <div class="text-muted small mt-1">${alert.description}</div>
-                            ${alert.source ? `<div class="text-muted small"><i class="fas fa-newspaper me-1"></i>${alert.source}</div>` : ''}
                         </div>
+                    </div>
+                `;
+                alertList.appendChild(alertItem);
+            });
+            console.log('Populated alert list with', allAlerts.length, 'alerts');
+        } else {
+            console.error('Alert list not found!');
+        }
+    } else {
+        // Hide notification badge
+        console.log('No alerts found, hiding notification badge');
+        
+        if (notificationIcon) {
+            notificationIcon.classList.remove('text-warning', 'has-alerts');
+            notificationIcon.classList.add('text-muted');
+        }
+        
+        if (alertCountBadge) {
+            alertCountBadge.style.display = 'none';
+        }
+        
+        if (alertList) {
+            alertList.innerHTML = `
+                <div class="dropdown-item text-center py-3">
+                    <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                    <p class="text-muted mb-0">No active alerts</p>
+                    <small class="text-muted">Your portfolio is performing well!</small>
                 </div>
             `;
-            alertList.appendChild(alertItem);
-            });
-            
-            // Add separator between categories
-            if (Object.keys(alertsByCategory).indexOf(category) < Object.keys(alertsByCategory).length - 1) {
-                const separator = document.createElement('hr');
-                separator.className = 'dropdown-divider';
-                alertList.appendChild(separator);
-            }
-        });
-    } else {
-        alertList.innerHTML = `
-            <div class="dropdown-item text-center py-3">
-                <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
-                <p class="text-muted mb-0">No active alerts</p>
-                <small class="text-muted">Your portfolio is performing well!</small>
-            </div>
-        `;
+        }
     }
     
     // Update portfolio summary
-    const totalAlerts = portfolioInsights.priceAlerts + portfolioInsights.newsAlerts;
-    const portfolioHealth = portfolioInsights.positiveSentiment > portfolioInsights.negativeSentiment ? 'Good' : 
-                           portfolioInsights.negativeSentiment > portfolioInsights.positiveSentiment ? 'Needs Attention' : 'Stable';
+    const portfolioStats = document.getElementById('portfolioStats');
+    const portfolioHealth = totalAlerts === 0 ? 'Good' : totalAlerts <= 3 ? 'Stable' : 'Needs Attention';
     
     portfolioStats.innerHTML = `
         <span class="badge ${portfolioHealth === 'Good' ? 'bg-success' : portfolioHealth === 'Needs Attention' ? 'bg-warning' : 'bg-info'}">${portfolioHealth}</span>
@@ -1295,34 +1370,23 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="row g-2 text-center">
             <div class="col-4">
                 <div class="small text-muted">Stocks</div>
-                <div class="fw-bold">${portfolioInsights.totalStocks}</div>
-            </div>
-            <div class="col-4">
-                <div class="small text-muted">Value</div>
-                <div class="fw-bold">$${portfolioInsights.totalValue.toFixed(0)}</div>
+                <div class="fw-bold">${stockRowElements.length}</div>
             </div>
             <div class="col-4">
                 <div class="small text-muted">Alerts</div>
                 <div class="fw-bold">${totalAlerts}</div>
             </div>
+            <div class="col-4">
+                <div class="small text-muted">Status</div>
+                <div class="fw-bold">${portfolioHealth}</div>
+            </div>
         </div>
-        ${portfolioInsights.topPerformers.length > 0 ? `
-            <div class="mt-2">
-                <small class="text-success"><i class="fas fa-arrow-up me-1"></i>Top: ${portfolioInsights.topPerformers[0].symbol} (+$${portfolioInsights.topPerformers[0].change.toFixed(2)})</small>
-            </div>
-        ` : ''}
-        ${portfolioInsights.underPerformers.length > 0 ? `
-            <div class="mt-1">
-                <small class="text-danger"><i class="fas fa-arrow-down me-1"></i>Worst: ${portfolioInsights.underPerformers[0].symbol} ($${portfolioInsights.underPerformers[0].change.toFixed(2)})</small>
-            </div>
-        ` : ''}
     `;
     
     document.getElementById('portfolioSummary').appendChild(insightsSection);
 
     // Stock row click handlers
-    const stockRows = document.querySelectorAll('.stock-row');
-    stockRows.forEach(row => {
+    stockRowElements.forEach(row => {
         row.addEventListener('click', function() {
             const symbol = this.getAttribute('data-symbol');
             selectStock(symbol, this);
@@ -1340,6 +1404,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // Clear stock filter button
+    const clearStockFilterBtn = document.getElementById('clearStockFilter');
+    if (clearStockFilterBtn) {
+        clearStockFilterBtn.addEventListener('click', clearStockFilter);
+    }
+
     // Performance monitoring
     const startTime = performance.now();
 });
@@ -1356,9 +1426,86 @@ function selectStock(symbol, rowElement) {
     // Update chart title
     document.getElementById('chartTitle').textContent = `${symbol} Price Chart`;
     
+    // Update news title and filter news by selected stock
+    document.getElementById('newsTitle').textContent = 'Stock News';
+    document.getElementById('selectedStockInfo').textContent = `(${symbol})`;
+    document.getElementById('selectedStockInfo').style.display = 'inline';
+    document.getElementById('clearStockFilter').style.display = 'inline-block';
+    
+    // Filter news by selected stock
+    filterNewsByStock(symbol);
+    
     // Update chart
     selectedStock = symbol;
     updateChart(symbol, currentPeriod);
+    
+    // Update news height after stock selection
+    setTimeout(setPortfolioNewsHeight, 100);
+}
+
+function filterNewsByStock(symbol) {
+    const newsCards = document.querySelectorAll('.news-card');
+    let visibleCount = 0;
+    
+    newsCards.forEach(card => {
+        const cardSymbol = card.dataset.symbol;
+        if (cardSymbol === symbol) {
+            card.style.display = 'block';
+            card.classList.remove('hidden');
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+            card.classList.add('hidden');
+        }
+    });
+    
+    // Update filter info
+    updateStockFilterInfo(symbol, visibleCount);
+}
+
+function updateStockFilterInfo(symbol, visibleCount) {
+    let filterInfo = document.getElementById('filterInfo');
+    if (!filterInfo) {
+        filterInfo = document.createElement('div');
+        filterInfo.id = 'filterInfo';
+        filterInfo.className = 'filter-info';
+        document.getElementById('portfolioNews').insertAdjacentElement('beforebegin', filterInfo);
+    }
+    
+    filterInfo.textContent = `Showing ${visibleCount} news articles for ${symbol}`;
+}
+
+function clearStockFilter() {
+    // Remove stock selection
+    document.querySelectorAll('.stock-row').forEach(row => {
+        row.classList.remove('selected');
+    });
+    
+    // Reset news title
+    document.getElementById('newsTitle').textContent = 'Portfolio News';
+    document.getElementById('selectedStockInfo').style.display = 'none';
+    document.getElementById('clearStockFilter').style.display = 'none';
+    
+    // Show all news
+    const newsCards = document.querySelectorAll('.news-card');
+    newsCards.forEach(card => {
+        card.style.display = 'block';
+        card.classList.remove('hidden');
+    });
+    
+    // Reset chart
+    document.getElementById('chartTitle').textContent = 'Select a stock to view chart';
+    document.getElementById('chartPlaceholder').style.display = 'block';
+    document.getElementById('portfolioChart').style.display = 'none';
+    if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+    }
+    
+    // Update filter info
+    updateStockFilterInfo('all stocks', newsCards.length);
+    
+    selectedStock = null;
 }
 
 function updateChart(symbol, period) {
@@ -1391,6 +1538,8 @@ function updateChart(symbol, period) {
             
             if (data && data.length > 0) {
                 createChart(data, symbol);
+                // Update news height after chart is created
+                setTimeout(setPortfolioNewsHeight, 100);
             } else {
                 showChartError('No data available for this period');
             }
@@ -1527,8 +1676,7 @@ function setStockSymbol(symbol) {
 
 function addStockToPortfolio() {
     const symbol = document.getElementById('stockSymbol').value.trim().toUpperCase();
-    const targetUp = document.getElementById('targetUp').value;
-    const targetDn = document.getElementById('targetDn').value;
+    const quantity = document.getElementById('stockQuantity').value;
     
     if (!symbol) {
         showModalAlert('Please enter a stock symbol', 'danger');
@@ -1544,8 +1692,7 @@ function addStockToPortfolio() {
     // Prepare form data
     const formData = new FormData();
     formData.append('symbol', symbol);
-    if (targetUp) formData.append('target_up', targetUp);
-    if (targetDn) formData.append('target_dn', targetDn);
+    formData.append('quantity', quantity);
     
     // Send request to add stock
     fetch('/add_stock', {
@@ -1636,6 +1783,54 @@ function refreshDashboard() {
     location.reload();
 }
 
+function testNotification() {
+    console.log('Manual test notification triggered');
+    
+    const notificationIcon = document.getElementById('notificationIcon');
+    const alertCountBadge = document.getElementById('alertCount');
+    const alertList = document.getElementById('alertList');
+    
+    console.log('Test - DOM elements:', {
+        notificationIcon: notificationIcon,
+        alertCountBadge: alertCountBadge,
+        alertList: alertList
+    });
+    
+    if (notificationIcon && alertCountBadge && alertList) {
+        // Force show notification
+        notificationIcon.classList.remove('text-muted');
+        notificationIcon.classList.add('text-warning', 'has-alerts');
+        alertCountBadge.textContent = '5';
+        alertCountBadge.style.display = 'block';
+        
+        alertList.innerHTML = `
+            <div class="dropdown-item alert-item">
+                <div class="d-flex align-items-start">
+                    <div class="flex-shrink-0 me-2">
+                        <i class="fas fa-exclamation-triangle text-warning"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong class="text-dark">TEST</strong>
+                                <span class="badge bg-secondary ms-1">test</span>
+                            </div>
+                            <span class="badge bg-warning">medium</span>
+                        </div>
+                        <div class="text-dark small mt-1">Manual test alert - notification system working!</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        console.log('Test notification should now be visible');
+        alert('Test notification triggered! Check the bell icon.');
+    } else {
+        console.error('Test failed - DOM elements not found');
+        alert('Test failed - DOM elements not found. Check console.');
+    }
+}
+
 // Portfolio News Sector Filter Functions
 function initializePortfolioSectorFilter() {
     const sectorFilter = document.getElementById('newsSectorFilter');
@@ -1721,6 +1916,37 @@ function updatePortfolioFilterInfo(selectedSector, visibleCount, totalCount) {
     } else {
         filterInfo.textContent = `Showing ${visibleCount} of ${totalCount} articles for ${selectedSector}`;
     }
+}
+
+function setPortfolioNewsHeight() {
+    const leftSide = document.querySelector('.col-12.col-lg-8');
+    const newsCard = document.querySelector('.col-12.col-lg-4 .card');
+    const newsContainer = document.getElementById('portfolioNews');
+    
+    if (leftSide && newsCard && newsContainer) {
+        // Get the height of the left side content (portfolio holdings + chart)
+        const leftHeight = leftSide.offsetHeight;
+        
+        // Set the news card height to match the left side
+        newsCard.style.height = `${leftHeight}px`;
+        
+        // Calculate the available height for the news content
+        const headerHeight = 120; // Approximate height of the filter header
+        const availableHeight = leftHeight - headerHeight;
+        
+        // Set the news container max height
+        newsContainer.style.maxHeight = `${availableHeight}px`;
+    }
+}
+
+// Handle window resize
+window.addEventListener('resize', function() {
+    setTimeout(setPortfolioNewsHeight, 100);
+});
+
+// Handle chart updates that might change the height
+function updateChartHeight() {
+    setTimeout(setPortfolioNewsHeight, 200);
 }
 </script>
 
