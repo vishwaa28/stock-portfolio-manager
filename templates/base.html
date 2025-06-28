@@ -33,8 +33,8 @@
 
         /* Navigation */
         .navbar {
-            background: var(--primary-gradient);
-            box-shadow: var(--card-shadow);
+            background: white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             padding: 1rem 0;
             border: none;
         }
@@ -42,7 +42,7 @@
         .navbar-brand {
             font-weight: 700;
             font-size: 1.5rem;
-            color: white !important;
+            color: #333 !important;
             text-decoration: none;
             display: flex;
             align-items: center;
@@ -55,7 +55,7 @@
         }
 
         .nav-link {
-            color: rgba(255, 255, 255, 0.9) !important;
+            color: #333 !important;
             font-weight: 500;
             margin: 0 0.5rem;
             padding: 0.5rem 1rem !important;
@@ -64,13 +64,13 @@
         }
 
         .nav-link:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: white !important;
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea !important;
         }
 
         .btn-outline-light {
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            color: white;
+            border: 2px solid #667eea;
+            color: #667eea;
             font-weight: 600;
             padding: 0.5rem 1.5rem;
             border-radius: 25px;
@@ -78,10 +78,10 @@
         }
 
         .btn-outline-light:hover {
-            background: white;
-            color: #667eea;
+            background: #667eea;
+            color: white;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
         }
        .ticker-container {
     background-color: #ffffff;
@@ -255,11 +255,12 @@
         }
 
         .table thead th {
-            background: var(--primary-gradient);
-            color: white;
+            background: white;
+            color: #333;
             border: none;
             font-weight: 600;
             padding: 1rem;
+            border-bottom: 2px solid #e9ecef;
         }
 
         .table tbody tr {
@@ -448,6 +449,43 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #5a6fd8;
         }
+
+        /* Stock logo styling */
+        .stock-logo {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            margin-right: 8px;
+            object-fit: contain;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+        }
+
+        .stock-logo-small {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            margin-right: 6px;
+            object-fit: contain;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+        }
+
+        .stock-logo-large {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            margin-right: 10px;
+            object-fit: contain;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+        }
+
+        .stock-symbol-with-logo {
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -518,14 +556,14 @@
     </main>
 
     <!-- Footer -->
-    <footer class="mt-5 py-4" style="background: var(--dark-gradient); color: white;">
+    <footer class="mt-5 py-4" style="background: white; color: #333; border-top: 1px solid #e9ecef;">
         <div class="container text-center">
             <div class="row">
                 <div class="col-md-4">
-                    <h5><i class="fas fa-chart-line"></i> Portfolio Manager</h5>
+                    <h5 style="color: #333;"><i class="fas fa-chart-line"></i> Portfolio Manager</h5>
                 </div>
                 <div class="col-md-4">
-                    <h6>Features</h6>
+                    <h6 style="color: #333;">Features</h6>
                     <ul class="list-unstyled text-muted">
                         <li><i class="fas fa-check"></i> Real-time Price Tracking</li>
                         <li><i class="fas fa-check"></i> News Sentiment Analysis</li>
@@ -533,7 +571,7 @@
                     </ul>
                 </div>
                 <div class="col-md-4">
-                    <h6>Market Status</h6>
+                    <h6 style="color: #333;">Market Status</h6>
                     <div class="d-flex justify-content-center align-items-center">
                         <div class="pulse" style="width: 10px; height: 10px; background: #27ae60; border-radius: 50%; margin-right: 10px;"></div>
                         <span class="text-success">Markets Open</span>
