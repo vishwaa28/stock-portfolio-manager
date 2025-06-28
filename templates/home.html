@@ -77,6 +77,9 @@
         {% for _ in range(2) %}  <!-- Duplicate items for smooth loop -->
             {% for stock in ticker_data %}
             <div class="ticker-item {{ 'up' if stock.change > 0 else 'down' if stock.change < 0 else 'neutral' }}">
+                {% if stock.logo %}
+                <img src="{{ stock.logo }}" alt="{{ stock.symbol }}" class="stock-logo-small" onerror="this.style.display='none'">
+                {% endif %}
                 <span class="symbol">{{ stock.symbol }}</span>
                 <span class="price stock-price" data-symbol="{{ stock.symbol }}">${{ "%.2f"|format(stock.price) }}</span>
             </div>
@@ -231,7 +234,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     setTimeout(() => { tr.click(); }, 100); // Auto-select first
                 }
                 tr.innerHTML = `
-                    <td><strong>${stock.symbol}</strong></td>
+                    <td><div class="stock-symbol-with-logo">
+                        ${stock.logo ? `<img src="${stock.logo}" alt="${stock.symbol}" class="stock-logo" onerror="this.style.display='none'">` : ''}
+                        <strong>${stock.symbol}</strong>
+                    </div></td>
                     <td><small class="text-muted">${stock.name}</small></td>
                     <td class="stock-price" data-symbol="${stock.symbol}">$${stock.price !== null ? stock.price.toFixed(2) : 'N/A'}</td>
                     <td class="${stock.change > 0 ? 'text-success' : stock.change < 0 ? 'text-danger' : ''}">${stock.change !== null ? stock.change.toFixed(2) : 'N/A'}</td>

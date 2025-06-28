@@ -43,9 +43,6 @@
                     <button class="btn btn-outline-primary" onclick="refreshDashboard()">
                         <i class="fas fa-sync-alt"></i> Refresh
                     </button>
-                    <button class="btn btn-outline-warning" onclick="testNotification()">
-                        <i class="fas fa-bell"></i> Test Alert
-                    </button>
                 </div>
             </div>
         </div>
@@ -126,7 +123,14 @@
                             <tbody>
                                 {% for row in table %}
                                 <tr class="stock-row" data-symbol="{{ row.symbol }}" style="cursor: pointer;">
-                                    <td><strong>{{ row.symbol }}</strong></td>
+                                    <td>
+                                        <div class="stock-symbol-with-logo">
+                                            {% if row.logo %}
+                                            <img src="{{ row.logo }}" alt="{{ row.symbol }}" class="stock-logo" onerror="this.style.display='none'">
+                                            {% endif %}
+                                            <strong>{{ row.symbol }}</strong>
+                                        </div>
+                                    </td>
                                     <td><small class="text-muted">{{ row.name|default('N/A') }}</small></td>
                                     <td class="stock-price" data-symbol="{{ row.symbol }}">${{ "%.2f"|format(row.price) }}</td>
                                     <td>{{ row.quantity }}</td>
@@ -291,11 +295,11 @@
 <div class="modal fade" id="addStockModal" tabindex="-1" aria-labelledby="addStockModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header bg-gradient-primary text-white">
+            <div class="modal-header bg-white text-dark">
                 <h5 class="modal-title" id="addStockModalLabel">
                     <i class="fas fa-plus-circle me-2"></i>Add Stock to Portfolio
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <form id="addStockForm">
@@ -463,12 +467,14 @@
 }
 
 .dropdown-header {
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    color: white;
+    background: white;
+    color: #333;
     font-weight: 600;
-    border-radius: var(--border-radius) var(--border-radius) 0 0;
+    border-radius: 12px 12px 0 0;
     margin: -0.5rem -0.5rem 0.5rem -0.5rem;
-    padding: 0.75rem 1rem;
+    padding: 1rem;
+    text-align: center;
+    border-bottom: 1px solid #e9ecef;
 }
 
 /* Alert Items */
@@ -579,13 +585,14 @@
 }
 
 .dropdown-header {
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    color: white;
+    background: white;
+    color: #333;
     font-weight: 600;
     border-radius: 12px 12px 0 0;
     margin: -0.5rem -0.5rem 0.5rem -0.5rem;
     padding: 1rem;
     text-align: center;
+    border-bottom: 1px solid #e9ecef;
 }
 
 .dropdown-header::before {
@@ -621,15 +628,12 @@
     margin-bottom: 0;
 }
 
-.table thead th {
-    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-    color: white;
+.table th {
+    background: white;
+    color: #333;
     border: none;
     font-weight: 600;
-    padding: 15px 12px;
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    border-bottom: 2px solid #e9ecef;
 }
 
 .table tbody tr {
@@ -819,8 +823,10 @@
 }
 
 .modal-header {
-    border: none;
-    border-radius: var(--border-radius) var(--border-radius) 0 0;
+    background: white;
+    color: #333;
+    border-radius: 12px 12px 0 0;
+    border-bottom: 1px solid #e9ecef;
 }
 
 .modal-footer {
@@ -830,7 +836,9 @@
 }
 
 .bg-gradient-primary {
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    background: white;
+    color: #333;
+    border-bottom: 1px solid #e9ecef;
 }
 
 /* Success Button Styling */
@@ -862,10 +870,11 @@
 }
 
 .table th {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    background: white;
+    color: #333;
     border: none;
     font-weight: 600;
+    border-bottom: 2px solid #e9ecef;
 }
 
 .table td {
@@ -934,7 +943,7 @@
 }
 
 .period-btn:hover, .period-btn.active {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #667eea;
     border-color: #667eea;
     color: white;
 }
@@ -1023,11 +1032,12 @@
 }
 
 .portfolio-insights {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    background: white;
+    color: #333;
     padding: 15px;
     border-radius: 8px;
     margin-bottom: 15px;
+    border: 1px solid #e9ecef;
 }
 
 .insight-item {
@@ -1055,9 +1065,10 @@
 }
 
 .modal-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    background: white;
+    color: #333;
     border-radius: 12px 12px 0 0;
+    border-bottom: 1px solid #e9ecef;
 }
 
 .quick-add-btn {
@@ -1154,236 +1165,179 @@ document.addEventListener('DOMContentLoaded', function() {
     // Get stock rows first
     const stockRowElements = document.querySelectorAll('.stock-row');
     
-    // Simple alert detection
+    // Smart alert detection - fetch actual alerts from backend
     let allAlerts = [];
     let totalAlerts = 0;
     
-    // Add a test alert to ensure the system works (remove this later)
-    allAlerts.push({
-        symbol: 'TEST',
-        title: 'Test alert - system is working',
-        severity: 'medium',
-        type: 'test'
-    });
-    totalAlerts++;
-    
-    // Force test - always show at least 1 alert for testing
-    if (totalAlerts === 0) {
-        allAlerts.push({
-            symbol: 'FORCE',
-            title: 'Forced test alert - system check',
-            severity: 'medium',
-            type: 'test'
-        });
-        totalAlerts = 1;
+    // Function to fetch alerts for a stock
+    async function fetchStockAlerts(symbol) {
+        try {
+            const response = await fetch(`/api/alerts/${symbol}`);
+            const data = await response.json();
+            return data.alerts || [];
+        } catch (error) {
+            console.error(`Error fetching alerts for ${symbol}:`, error);
+            return [];
+        }
     }
     
-    // Check for negative sentiment in news
-    const negativeNews = document.querySelectorAll('.news-card[data-sentiment="negative"]');
-    negativeNews.forEach(news => {
-        const symbol = news.dataset.symbol;
-        const score = parseFloat(news.dataset.score);
-        const title = news.querySelector('h6').textContent;
+    // Check for alerts in portfolio stocks
+    async function checkAllAlerts() {
+        const alertPromises = [];
         
-        if (score > 0.6) { // High negative sentiment
-            allAlerts.push({
-                symbol: symbol,
-                title: `Negative news: ${title.substring(0, 50)}...`,
-                severity: 'high',
-                type: 'news'
-            });
-            totalAlerts++;
-        }
-    });
-    
-    // Check for alerts in portfolio stocks (from backend alerts array)
-    stockRowElements.forEach(row => {
-        const symbol = row.querySelector('td:first-child strong').textContent;
-        const alertsCell = row.querySelector('td:nth-child(9)');
-        
-        console.log(`Checking alerts for ${symbol}:`, {
-            alertsCell: alertsCell,
-            alertsCellHTML: alertsCell ? alertsCell.innerHTML : 'null'
+        stockRowElements.forEach(row => {
+            const symbol = row.querySelector('td:first-child strong').textContent;
+            alertPromises.push(fetchStockAlerts(symbol));
         });
         
-        // Check if there are any alerts displayed in the alerts column
-        if (alertsCell) {
-            const alertBadge = alertsCell.querySelector('.badge');
-            console.log(`Alert badge for ${symbol}:`, {
-                alertBadge: alertBadge,
-                badgeText: alertBadge ? alertBadge.textContent : 'null'
-            });
+        try {
+            const allStockAlerts = await Promise.all(alertPromises);
             
-            if (alertBadge && alertBadge.textContent !== '-') {
-                const alertCount = parseInt(alertBadge.textContent);
-                console.log(`Alert count for ${symbol}:`, alertCount);
-                if (alertCount > 0) {
-                    allAlerts.push({
-                        symbol: symbol,
-                        title: `${symbol} has ${alertCount} alert(s)`,
-                        severity: 'medium',
-                        type: 'portfolio'
+            stockRowElements.forEach((row, index) => {
+                const symbol = row.querySelector('td:first-child strong').textContent;
+                const stockAlerts = allStockAlerts[index];
+                
+                if (stockAlerts && stockAlerts.length > 0) {
+                    stockAlerts.forEach(alert => {
+                        allAlerts.push({
+                            symbol: symbol,
+                            title: alert.message,
+                            severity: alert.severity,
+                            type: alert.type
+                        });
+                        totalAlerts++;
                     });
-                    totalAlerts += alertCount;
-                    console.log(`Added portfolio alert for ${symbol}, total alerts now:`, totalAlerts);
                 }
-            }
-        }
-        
-        // Check for negative sentiment
-        const sentimentCell = row.querySelector('td:nth-child(7) .badge');
-        const sentimentScoreCell = row.querySelector('td:nth-child(8) .badge');
-        
-        console.log(`Sentiment check for ${symbol}:`, {
-            sentimentCell: sentimentCell ? sentimentCell.textContent : 'null',
-            sentimentScoreCell: sentimentScoreCell ? sentimentScoreCell.textContent : 'null'
-        });
-        
-        if (sentimentCell && sentimentScoreCell) {
-            const sentiment = sentimentCell.textContent;
-            const sentimentScore = parseFloat(sentimentScoreCell.textContent);
+            });
             
-            if (sentiment.includes('Negative') || sentimentScore < 0.4) {
-                allAlerts.push({
-                    symbol: symbol,
-                    title: `${symbol} showing negative sentiment`,
-                    severity: sentimentScore < 0.3 ? 'high' : 'medium',
-                    type: 'sentiment'
-                });
-                totalAlerts++;
-                console.log(`Added sentiment alert for ${symbol}, total alerts now:`, totalAlerts);
+            updateNotificationDisplay();
+        } catch (error) {
+            console.error('Error checking alerts:', error);
+        }
+    }
+    
+    // Update notification display
+    function updateNotificationDisplay() {
+        const notificationIcon = document.getElementById('notificationIcon');
+        const alertCountBadge = document.getElementById('alertCount');
+        const alertList = document.getElementById('alertList');
+        
+        if (totalAlerts > 0) {
+            // Show notification badge
+            if (notificationIcon) {
+                notificationIcon.classList.remove('text-muted');
+                notificationIcon.classList.add('text-warning', 'has-alerts');
             }
-        }
-    });
-    
-    // Update notification icon
-    const notificationIcon = document.getElementById('notificationIcon');
-    const alertCountBadge = document.getElementById('alertCount');
-    const alertList = document.getElementById('alertList');
-    
-    console.log('DOM elements found:', {
-        notificationIcon: notificationIcon,
-        alertCountBadge: alertCountBadge,
-        alertList: alertList
-    });
-    
-    console.log('Alert detection results:', {
-        totalAlerts: totalAlerts,
-        allAlerts: allAlerts,
-        negativeNewsCount: document.querySelectorAll('.news-card[data-sentiment="negative"]').length,
-        stockRowsCount: stockRowElements.length
-    });
-    
-    if (totalAlerts > 0) {
-        // Show notification badge
-        console.log('Attempting to show notification badge with', totalAlerts, 'alerts');
-        
-        if (notificationIcon) {
-            notificationIcon.classList.remove('text-muted');
-            notificationIcon.classList.add('text-warning', 'has-alerts');
-            console.log('Updated notification icon classes');
-        } else {
-            console.error('Notification icon not found!');
-        }
-        
-        if (alertCountBadge) {
-            alertCountBadge.textContent = totalAlerts;
-            alertCountBadge.style.display = 'block';
-            console.log('Updated alert count badge');
-        } else {
-            console.error('Alert count badge not found!');
-        }
-        
-        console.log('Showing alerts:', totalAlerts);
-        
-        // Populate alert dropdown
-        if (alertList) {
-            alertList.innerHTML = '';
             
-            allAlerts.forEach(alert => {
-                const alertItem = document.createElement('div');
-                alertItem.className = 'dropdown-item alert-item';
-                alertItem.setAttribute('data-severity', alert.severity);
+            if (alertCountBadge) {
+                alertCountBadge.textContent = totalAlerts;
+                alertCountBadge.style.display = 'block';
+            }
+            
+            // Populate alert dropdown
+            if (alertList) {
+                alertList.innerHTML = '';
                 
-                const severityIcon = alert.severity === 'high' ? 'fas fa-exclamation-circle text-danger' : 
-                                   'fas fa-exclamation-triangle text-warning';
-                
-                alertItem.innerHTML = `
-                    <div class="d-flex align-items-start">
-                        <div class="flex-shrink-0 me-2">
-                            <i class="${severityIcon}"></i>
-                        </div>
-                        <div class="flex-grow-1">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div>
-                                    <strong class="text-dark">${alert.symbol}</strong>
-                                    <span class="badge bg-secondary ms-1">${alert.type}</span>
-                                </div>
-                                <span class="badge ${alert.severity === 'high' ? 'bg-danger' : 'bg-warning'}">${alert.severity}</span>
+                allAlerts.forEach(alert => {
+                    const alertItem = document.createElement('div');
+                    alertItem.className = 'dropdown-item alert-item';
+                    alertItem.setAttribute('data-severity', alert.severity);
+                    
+                    const severityIcon = alert.severity === 'high' ? 'fas fa-exclamation-circle text-danger' : 
+                                       'fas fa-exclamation-triangle text-warning';
+                    
+                    alertItem.innerHTML = `
+                        <div class="d-flex align-items-start">
+                            <div class="flex-shrink-0 me-2">
+                                <i class="${severityIcon}"></i>
                             </div>
-                            <div class="text-dark small mt-1">${alert.title}</div>
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <strong class="text-dark">${alert.symbol}</strong>
+                                        <span class="badge bg-secondary ms-1">${alert.type}</span>
+                                    </div>
+                                    <span class="badge ${alert.severity === 'high' ? 'bg-danger' : 'bg-warning'}">${alert.severity}</span>
+                                </div>
+                                <div class="text-dark small mt-1">${alert.title}</div>
+                            </div>
                         </div>
+                    `;
+                    alertList.appendChild(alertItem);
+                });
+            }
+        } else {
+            // Hide notification badge
+            if (notificationIcon) {
+                notificationIcon.classList.remove('text-warning', 'has-alerts');
+                notificationIcon.classList.add('text-muted');
+            }
+            
+            if (alertCountBadge) {
+                alertCountBadge.style.display = 'none';
+            }
+            
+            if (alertList) {
+                alertList.innerHTML = `
+                    <div class="dropdown-item text-center py-3">
+                        <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                        <p class="text-muted mb-0">No active alerts</p>
+                        <small class="text-muted">Your portfolio is performing well!</small>
                     </div>
                 `;
-                alertList.appendChild(alertItem);
-            });
-            console.log('Populated alert list with', allAlerts.length, 'alerts');
-        } else {
-            console.error('Alert list not found!');
-        }
-    } else {
-        // Hide notification badge
-        console.log('No alerts found, hiding notification badge');
-        
-        if (notificationIcon) {
-            notificationIcon.classList.remove('text-warning', 'has-alerts');
-            notificationIcon.classList.add('text-muted');
-        }
-        
-        if (alertCountBadge) {
-            alertCountBadge.style.display = 'none';
-        }
-        
-        if (alertList) {
-            alertList.innerHTML = `
-                <div class="dropdown-item text-center py-3">
-                    <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
-                    <p class="text-muted mb-0">No active alerts</p>
-                    <small class="text-muted">Your portfolio is performing well!</small>
-                </div>
-            `;
+            }
         }
     }
     
-    // Update portfolio summary
-    const portfolioStats = document.getElementById('portfolioStats');
-    const portfolioHealth = totalAlerts === 0 ? 'Good' : totalAlerts <= 3 ? 'Stable' : 'Needs Attention';
+    // Check alerts on page load
+    checkAllAlerts();
     
-    portfolioStats.innerHTML = `
-        <span class="badge ${portfolioHealth === 'Good' ? 'bg-success' : portfolioHealth === 'Needs Attention' ? 'bg-warning' : 'bg-info'}">${portfolioHealth}</span>
-    `;
+    // Update portfolio summary after alerts are loaded
+    setTimeout(() => {
+        updatePortfolioSummary();
+    }, 1000);
     
-    // Add portfolio insights section
-    const insightsSection = document.createElement('div');
-    insightsSection.className = 'dropdown-item';
-    insightsSection.innerHTML = `
-        <div class="row g-2 text-center">
-            <div class="col-4">
-                <div class="small text-muted">Stocks</div>
-                <div class="fw-bold">${stockRowElements.length}</div>
-            </div>
-            <div class="col-4">
-                <div class="small text-muted">Alerts</div>
-                <div class="fw-bold">${totalAlerts}</div>
-            </div>
-            <div class="col-4">
-                <div class="small text-muted">Status</div>
-                <div class="fw-bold">${portfolioHealth}</div>
-            </div>
-        </div>
-    `;
-    
-    document.getElementById('portfolioSummary').appendChild(insightsSection);
+    function updatePortfolioSummary() {
+        const portfolioStats = document.getElementById('portfolioStats');
+        const portfolioHealth = totalAlerts === 0 ? 'Good' : totalAlerts <= 3 ? 'Stable' : 'Needs Attention';
+        
+        if (portfolioStats) {
+            portfolioStats.innerHTML = `
+                <span class="badge ${portfolioHealth === 'Good' ? 'bg-success' : portfolioHealth === 'Needs Attention' ? 'bg-warning' : 'bg-info'}">${portfolioHealth}</span>
+            `;
+        }
+        
+        // Add portfolio insights section
+        const portfolioSummary = document.getElementById('portfolioSummary');
+        if (portfolioSummary) {
+            // Remove existing insights if any
+            const existingInsights = portfolioSummary.querySelector('.insights-section');
+            if (existingInsights) {
+                existingInsights.remove();
+            }
+            
+            const insightsSection = document.createElement('div');
+            insightsSection.className = 'dropdown-item insights-section';
+            insightsSection.innerHTML = `
+                <div class="row g-2 text-center">
+                    <div class="col-4">
+                        <div class="small text-muted">Stocks</div>
+                        <div class="fw-bold">${stockRowElements.length}</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted">Alerts</div>
+                        <div class="fw-bold">${totalAlerts}</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted">Status</div>
+                        <div class="fw-bold">${portfolioHealth}</div>
+                    </div>
+                </div>
+            `;
+            
+            portfolioSummary.appendChild(insightsSection);
+        }
+    }
 
     // Stock row click handlers
     stockRowElements.forEach(row => {
@@ -1780,55 +1734,17 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function refreshDashboard() {
-    location.reload();
-}
-
-function testNotification() {
-    console.log('Manual test notification triggered');
+    // Reset alert counters
+    allAlerts = [];
+    totalAlerts = 0;
     
-    const notificationIcon = document.getElementById('notificationIcon');
-    const alertCountBadge = document.getElementById('alertCount');
-    const alertList = document.getElementById('alertList');
+    // Refresh alerts
+    checkAllAlerts();
     
-    console.log('Test - DOM elements:', {
-        notificationIcon: notificationIcon,
-        alertCountBadge: alertCountBadge,
-        alertList: alertList
-    });
-    
-    if (notificationIcon && alertCountBadge && alertList) {
-        // Force show notification
-        notificationIcon.classList.remove('text-muted');
-        notificationIcon.classList.add('text-warning', 'has-alerts');
-        alertCountBadge.textContent = '5';
-        alertCountBadge.style.display = 'block';
-        
-        alertList.innerHTML = `
-            <div class="dropdown-item alert-item">
-                <div class="d-flex align-items-start">
-                    <div class="flex-shrink-0 me-2">
-                        <i class="fas fa-exclamation-triangle text-warning"></i>
-                    </div>
-                    <div class="flex-grow-1">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <strong class="text-dark">TEST</strong>
-                                <span class="badge bg-secondary ms-1">test</span>
-                            </div>
-                            <span class="badge bg-warning">medium</span>
-                        </div>
-                        <div class="text-dark small mt-1">Manual test alert - notification system working!</div>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        console.log('Test notification should now be visible');
-        alert('Test notification triggered! Check the bell icon.');
-    } else {
-        console.error('Test failed - DOM elements not found');
-        alert('Test failed - DOM elements not found. Check console.');
-    }
+    // Refresh the page after a short delay to show updated data
+    setTimeout(() => {
+        location.reload();
+    }, 500);
 }
 
 // Portfolio News Sector Filter Functions

@@ -2,8 +2,8 @@ from flask import Flask, render_template, redirect, url_for, request, flash, jso
 from flask_login import LoginManager, login_user, login_required, current_user, logout_user
 from apscheduler.schedulers.background import BackgroundScheduler
 from config import Config
-from models import db, User, PortfolioStock, WatchlistStock
-from api_clients import fetch_price, fetch_news, fetch_all_stocks, fetch_general_news, fetch_detailed_stocks, fetch_sector_news, fetch_company_profile, fetch_previous_close
+from models import db, User, PortfolioStock, WatchlistStock, SentimentHistory
+from api_clients import fetch_price, fetch_news, fetch_all_stocks, fetch_general_news, fetch_detailed_stocks, fetch_sector_news, fetch_company_profile, fetch_previous_close, fetch_stock_logo
 from sentiment import analyze_sentiment
 import random
 from datetime import datetime, timedelta
@@ -66,6 +66,10 @@ def create_app():
         # Use cached data for better performance
         stocks = fetch_all_stocks()
         ticker_data = fetch_detailed_stocks(limit=5)  # Reduced from 10 to 5
+        
+        # Add logo data to ticker_data
+        for stock in ticker_data:
+            stock['logo'] = fetch_stock_logo(stock['symbol'])
         
         # Fetch news from different sectors for better filtering
         news_list = []
@@ -157,7 +161,6 @@ def create_app():
                 # Calculate sentiment score based on actual sentiment
                 if sentiment == "negative":
                     sentiment_score = 0.2  # Low score for negative
-                    alerts.append(f"⚠️ Negative sentiment: \"{n['title'][:50]}...\"")
                     negative_count += 1
                 elif sentiment == "positive":
                     sentiment_score = 0.8  # High score for positive
@@ -176,12 +179,6 @@ def create_app():
             # Calculate average sentiment score
             avg_sentiment_score = total_sentiment_score / news_count if news_count > 0 else 0.5
 
-            # Add price alerts if targets are set
-            if stock.target_up and price >= stock.target_up:
-                alerts.append(f"🎯 Price target reached: ${price} >= ${stock.target_up}")
-            if stock.target_dn and price <= stock.target_dn:
-                alerts.append(f"⚠️ Price dropped below target: ${price} <= ${stock.target_dn}")
-
             # Determine overall sentiment
             if positive_count > negative_count:
                 sentiment_class = "positive"
@@ -195,6 +192,24 @@ def create_app():
                 sentiment_class = "neutral"
                 sentiment_text = "➖ Neutral"
                 overall_sentiment["neutral"] += 1
+
+            # Check for sentiment change alerts using smart alert system
+            previous_sentiment = get_previous_sentiment(stock.symbol, current_user.id)
+            should_alert, alert_message = should_alert_sentiment_change(
+                previous_sentiment, avg_sentiment_score, sentiment_class
+            )
+            
+            if should_alert:
+                alerts.append(f"🚨 {alert_message}")
+            
+            # Save current sentiment to history
+            save_sentiment_history(stock.symbol, current_user.id, avg_sentiment_score, sentiment_class)
+
+            # Add price alerts if targets are set
+            if stock.target_up and price >= stock.target_up:
+                alerts.append(f"🎯 Price target reached: ${price} >= ${stock.target_up}")
+            if stock.target_dn and price <= stock.target_dn:
+                alerts.append(f"⚠️ Price dropped below target: ${price} <= ${stock.target_dn}")
 
             # Combine stock news and sector news
             all_news = news + sector_news
@@ -215,7 +230,8 @@ def create_app():
                 "sentiment_score": avg_sentiment_score,
                 "target_up": stock.target_up,
                 "target_dn": stock.target_dn,
-                "sector": sector
+                "sector": sector,
+                "logo": fetch_stock_logo(stock.symbol)
             })
         
         # Only send email if there are stocks in portfolio
@@ -256,7 +272,8 @@ def create_app():
                 "percent": s["percent"],
                 "volume": s["volume"],
                 "sector": s["sector"],
-                "market_cap": s["market_cap"]
+                "market_cap": s["market_cap"],
+                "logo": fetch_stock_logo(s["symbol"])
             } for s in stocks
         ])
 
@@ -427,6 +444,145 @@ def create_app():
                 "status": "error",
                 "message": f"Database error: {str(e)}"
             }), 500
+
+    def get_previous_sentiment(symbol, user_id, hours_back=24):
+        """Get the most recent sentiment data for a stock within the specified hours"""
+        cutoff_time = datetime.utcnow() - timedelta(hours=hours_back)
+        previous_sentiment = SentimentHistory.query.filter_by(
+            symbol=symbol, 
+            user_id=user_id
+        ).filter(
+            SentimentHistory.timestamp >= cutoff_time
+        ).order_by(SentimentHistory.timestamp.desc()).first()
+        
+        return previous_sentiment
+
+    def should_alert_sentiment_change(previous_sentiment, current_sentiment_score, current_sentiment_class):
+        """
+        Determine if we should alert based on sentiment change
+        Alerts only when:
+        1. Moving from positive to negative (score drops below 0.4)
+        2. Moving from neutral to very negative (score drops below 0.3)
+        3. Significant drop in score (more than 0.3 points)
+        """
+        if not previous_sentiment:
+            # No previous data, don't alert
+            return False, None
+        
+        previous_score = previous_sentiment.sentiment_score
+        previous_class = previous_sentiment.sentiment_class
+        score_change = previous_score - current_sentiment_score
+        
+        # Case 1: Moving from positive to negative
+        if previous_class == "positive" and current_sentiment_score < 0.4:
+            return True, f"Sentiment dropped from positive ({previous_score:.2f}) to negative ({current_sentiment_score:.2f})"
+        
+        # Case 2: Moving from neutral to very negative
+        if previous_class == "neutral" and current_sentiment_score < 0.3:
+            return True, f"Sentiment dropped from neutral ({previous_score:.2f}) to very negative ({current_sentiment_score:.2f})"
+        
+        # Case 3: Significant drop in score (more than 0.3 points)
+        if score_change > 0.3:
+            return True, f"Significant sentiment drop: {previous_score:.2f} → {current_sentiment_score:.2f} (change: -{score_change:.2f})"
+        
+        return False, None
+
+    def save_sentiment_history(symbol, user_id, sentiment_score, sentiment_class):
+        """Save current sentiment data to history"""
+        try:
+            sentiment_record = SentimentHistory(
+                symbol=symbol,
+                user_id=user_id,
+                sentiment_score=sentiment_score,
+                sentiment_class=sentiment_class
+            )
+            db.session.add(sentiment_record)
+            db.session.commit()
+        except Exception as e:
+            print(f"Error saving sentiment history for {symbol}: {e}")
+            db.session.rollback()
+
+    @app.route("/api/alerts/<symbol>")
+    @login_required
+    def api_alerts(symbol):
+        """Get alerts for a specific stock"""
+        try:
+            # Get the stock from user's portfolio
+            stock = PortfolioStock.query.filter_by(
+                user_id=current_user.id, 
+                symbol=symbol
+            ).first()
+            
+            if not stock:
+                return jsonify({"alerts": []})
+            
+            # Get current sentiment data
+            price = fetch_price(symbol)
+            news = fetch_news(symbol, limit=2)
+            
+            # Calculate current sentiment
+            positive_count = 0
+            negative_count = 0
+            total_sentiment_score = 0
+            news_count = 0
+            
+            for n in news:
+                sentiment = analyze_sentiment(n["title"] + " " + n.get("description", ""))
+                if sentiment == "negative":
+                    sentiment_score = 0.2
+                    negative_count += 1
+                elif sentiment == "positive":
+                    sentiment_score = 0.8
+                    positive_count += 1
+                else:
+                    sentiment_score = 0.5
+                
+                total_sentiment_score += sentiment_score
+                news_count += 1
+            
+            avg_sentiment_score = total_sentiment_score / news_count if news_count > 0 else 0.5
+            
+            # Determine sentiment class
+            if positive_count > negative_count:
+                sentiment_class = "positive"
+            elif negative_count > positive_count:
+                sentiment_class = "negative"
+            else:
+                sentiment_class = "neutral"
+            
+            # Check for sentiment change alerts
+            previous_sentiment = get_previous_sentiment(symbol, current_user.id)
+            should_alert, alert_message = should_alert_sentiment_change(
+                previous_sentiment, avg_sentiment_score, sentiment_class
+            )
+            
+            alerts = []
+            if should_alert:
+                alerts.append({
+                    "type": "sentiment_change",
+                    "message": alert_message,
+                    "severity": "high" if avg_sentiment_score < 0.3 else "medium"
+                })
+            
+            # Add price alerts if targets are set
+            if stock.target_up and price >= stock.target_up:
+                alerts.append({
+                    "type": "price_target",
+                    "message": f"Price target reached: ${price} >= ${stock.target_up}",
+                    "severity": "medium"
+                })
+            if stock.target_dn and price <= stock.target_dn:
+                alerts.append({
+                    "type": "price_target",
+                    "message": f"Price dropped below target: ${price} <= ${stock.target_dn}",
+                    "severity": "high"
+                })
+            
+            return jsonify({"alerts": alerts})
+            
+        except Exception as e:
+            print(f"Error getting alerts for {symbol}: {e}")
+            return jsonify({"alerts": []})
 
     return app
 

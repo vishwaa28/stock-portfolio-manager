@@ -267,6 +267,25 @@ def fetch_company_profile(symbol):
         print(f"Error fetching company profile for {symbol}: {e}")
         return {}
 
+@lru_cache(maxsize=100)
+def fetch_stock_logo(symbol):
+    """Fetch stock logo URL from Finnhub API"""
+    cache_key = f"logo_{symbol}"
+    cached = _get_cached_data(cache_key)
+    if cached:
+        return cached
+        
+    url = f"https://finnhub.io/api/v1/stock/profile2?symbol={symbol}&token={FINNHUB_API_KEY}"
+    try:
+        response = requests.get(url, timeout=5)
+        data = response.json()
+        logo_url = data.get("logo", "")
+        _set_cached_data(cache_key, logo_url)
+        return logo_url
+    except Exception as e:
+        print(f"Error fetching logo for {symbol}: {e}")
+        return ""
+
 def fetch_previous_close(symbol):
     url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={FINNHUB_API_KEY}"
     try:
@@ -298,6 +317,7 @@ def fetch_detailed_stocks(limit=10):
                 percent = ((price - previous_close) / previous_close) * 100 if previous_close else 0
             sector = profile.get("finnhubIndustry", "Unknown") if profile else "Unknown"
             market_cap = profile.get("marketCapitalization", "N/A") if profile else "N/A"
+            logo = fetch_stock_logo(symbol)
             stocks.append({
                 "symbol": symbol,
                 "name": profile.get("name", "Unknown") if profile else "Unknown",
@@ -306,7 +326,8 @@ def fetch_detailed_stocks(limit=10):
                 "volume": volume,
                 "sector": sector,
                 "market_cap": market_cap,
-                "price": price
+                "price": price,
+                "logo": logo
             })
         except Exception as e:
             print(f"Error fetching detailed stock data for {symbol}: {e}")
