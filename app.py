@@ -133,8 +133,11 @@ def create_app():
                 days_gain_pct = ((price - previous_close) / previous_close) * 100 if previous_close else None
             
             # Calculate overall gain percentage if purchase price is available
-            if stock.purchase_price and price:
-                overall_gain_pct = ((price - stock.purchase_price) / stock.purchase_price) * 100 if stock.purchase_price else None
+            if stock.purchase_price and price and stock.purchase_price > 0:
+                overall_gain_pct = ((price - stock.purchase_price) / stock.purchase_price) * 100
+            else:
+                # If no purchase price is set, show N/A or calculate based on a default
+                overall_gain_pct = None
             
             # Calculate total value for this stock (price * quantity)
             stock_total_value = price * stock.quantity if price else 0
@@ -157,7 +160,12 @@ def create_app():
             news_count = 0
 
             for n in news:
-                sentiment = analyze_sentiment(n["title"] + " " + n.get("description", ""))
+                # Use enhanced sentiment analysis that considers price changes
+                sentiment = analyze_sentiment(
+                    n["title"] + " " + n.get("description", ""), 
+                    price_change=change, 
+                    price_change_percent=days_gain_pct
+                )
                 # Calculate sentiment score based on actual sentiment
                 if sentiment == "negative":
                     sentiment_score = 0.2  # Low score for negative
@@ -179,19 +187,35 @@ def create_app():
             # Calculate average sentiment score
             avg_sentiment_score = total_sentiment_score / news_count if news_count > 0 else 0.5
 
-            # Determine overall sentiment
-            if positive_count > negative_count:
-                sentiment_class = "positive"
-                sentiment_text = "📈 Positive"
-                overall_sentiment["positive"] += 1
-            elif negative_count > positive_count:
-                sentiment_class = "negative"
-                sentiment_text = "📉 Negative"
-                overall_sentiment["negative"] += 1
+            # Determine overall sentiment - also consider price changes if no news
+            if news_count == 0 and change is not None:
+                # If no news, base sentiment on price change
+                if change > 0:
+                    sentiment_class = "positive"
+                    sentiment_text = "📈 Positive"
+                    overall_sentiment["positive"] += 1
+                elif change < 0:
+                    sentiment_class = "negative"
+                    sentiment_text = "📉 Negative"
+                    overall_sentiment["negative"] += 1
+                else:
+                    sentiment_class = "neutral"
+                    sentiment_text = "➖ Neutral"
+                    overall_sentiment["neutral"] += 1
             else:
-                sentiment_class = "neutral"
-                sentiment_text = "➖ Neutral"
-                overall_sentiment["neutral"] += 1
+                # Use news-based sentiment
+                if positive_count > negative_count:
+                    sentiment_class = "positive"
+                    sentiment_text = "📈 Positive"
+                    overall_sentiment["positive"] += 1
+                elif negative_count > positive_count:
+                    sentiment_class = "negative"
+                    sentiment_text = "📉 Negative"
+                    overall_sentiment["negative"] += 1
+                else:
+                    sentiment_class = "neutral"
+                    sentiment_text = "➖ Neutral"
+                    overall_sentiment["neutral"] += 1
 
             # Check for sentiment change alerts using smart alert system
             previous_sentiment = get_previous_sentiment(stock.symbol, current_user.id)
@@ -214,6 +238,14 @@ def create_app():
             # Combine stock news and sector news
             all_news = news + sector_news
 
+            # Calculate portfolio impact
+            portfolio_impact = calculate_portfolio_impact(
+                stock.quantity, 
+                overall_gain_pct, 
+                total_value,
+                stock_total_value
+            )
+
             table.append({
                 "symbol": stock.symbol,
                 "name": profile.get("name", stock.symbol) if profile else stock.symbol,
@@ -223,6 +255,7 @@ def create_app():
                 "change": change,
                 "days_gain_pct": days_gain_pct,
                 "overall_gain_pct": overall_gain_pct,
+                "portfolio_impact": portfolio_impact,
                 "news": all_news,
                 "alerts": alerts,
                 "sentiment_class": sentiment_class,
@@ -372,7 +405,17 @@ def create_app():
         with app.app_context():
             for stock in PortfolioStock.query.all():
                 for article in fetch_news(stock.symbol, limit=3):
-                    sentiment = analyze_sentiment(article["title"] + " " + article.get("description", ""))
+                    # Get current price and change for enhanced sentiment analysis
+                    price = fetch_price(stock.symbol)
+                    previous_close = fetch_previous_close(stock.symbol)
+                    change = price - previous_close if price and previous_close else 0
+                    days_gain_pct = ((price - previous_close) / previous_close) * 100 if price and previous_close else None
+                    
+                    sentiment = analyze_sentiment(
+                        article["title"] + " " + article.get("description", ""),
+                        price_change=change,
+                        price_change_percent=days_gain_pct
+                    )
                     if sentiment == "negative":
                         print(f"[SENTIMENT ALERT] {stock.symbol}: {article['title']}")
 
@@ -520,6 +563,15 @@ def create_app():
             price = fetch_price(symbol)
             news = fetch_news(symbol, limit=2)
             
+            # Calculate price change for enhanced sentiment analysis
+            previous_close = fetch_previous_close(symbol)
+            change = 0
+            days_gain_pct = None
+            
+            if previous_close and price:
+                change = price - previous_close
+                days_gain_pct = ((price - previous_close) / previous_close) * 100 if previous_close else None
+            
             # Calculate current sentiment
             positive_count = 0
             negative_count = 0
@@ -527,7 +579,12 @@ def create_app():
             news_count = 0
             
             for n in news:
-                sentiment = analyze_sentiment(n["title"] + " " + n.get("description", ""))
+                # Use enhanced sentiment analysis that considers price changes
+                sentiment = analyze_sentiment(
+                    n["title"] + " " + n.get("description", ""),
+                    price_change=change,
+                    price_change_percent=days_gain_pct
+                )
                 if sentiment == "negative":
                     sentiment_score = 0.2
                     negative_count += 1
@@ -542,13 +599,23 @@ def create_app():
             
             avg_sentiment_score = total_sentiment_score / news_count if news_count > 0 else 0.5
             
-            # Determine sentiment class
-            if positive_count > negative_count:
-                sentiment_class = "positive"
-            elif negative_count > positive_count:
-                sentiment_class = "negative"
+            # Determine sentiment class - also consider price changes if no news
+            if news_count == 0 and change is not None:
+                # If no news, base sentiment on price change
+                if change > 0:
+                    sentiment_class = "positive"
+                elif change < 0:
+                    sentiment_class = "negative"
+                else:
+                    sentiment_class = "neutral"
             else:
-                sentiment_class = "neutral"
+                # Use news-based sentiment
+                if positive_count > negative_count:
+                    sentiment_class = "positive"
+                elif negative_count > positive_count:
+                    sentiment_class = "negative"
+                else:
+                    sentiment_class = "neutral"
             
             # Check for sentiment change alerts
             previous_sentiment = get_previous_sentiment(symbol, current_user.id)
@@ -583,6 +650,41 @@ def create_app():
         except Exception as e:
             print(f"Error getting alerts for {symbol}: {e}")
             return jsonify({"alerts": []})
+
+    def calculate_portfolio_impact(quantity, gain_percentage, total_portfolio_value, stock_total_value):
+        """
+        Calculate the impact of a stock on the portfolio
+        Impact is based on:
+        1. Quantity (more shares = higher impact)
+        2. Gain percentage (better performance = higher impact)
+        3. Relative to total portfolio value
+        
+        Returns: 'small', 'mid', or 'large'
+        """
+        if total_portfolio_value == 0:
+            return 'small'
+        
+        # Calculate impact score
+        # Base impact from quantity (normalized)
+        quantity_impact = min(quantity / 50, 1.0)  # Cap at 50 shares for max impact
+        
+        # Performance impact (handle None and 0 values)
+        if gain_percentage is None:
+            performance_impact = 0.5  # Neutral if no gain data
+        else:
+            # Normalize performance: -20% to +20% range, with 0% being neutral
+            performance_impact = max(0, min(1, (gain_percentage + 20) / 40))
+        
+        # Combined impact score
+        impact_score = (quantity_impact * 0.7) + (performance_impact * 0.3)
+        
+        # Determine impact level
+        if impact_score >= 0.6:
+            return 'large'
+        elif impact_score >= 0.3:
+            return 'mid'
+        else:
+            return 'small'
 
     return app
 

@@ -50,7 +50,7 @@
 
     <!-- Portfolio Summary Cards -->
     <div class="row g-3 mb-4">
-        <div class="col-md-3 col-6">
+        <div class="col-md-2 col-6">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body d-flex align-items-center gap-3">
                     <div class="icon-box bg-light text-dark"><i class="fas fa-wallet"></i></div>
@@ -61,7 +61,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3 col-6">
+        <div class="col-md-2 col-6">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body d-flex align-items-center gap-3">
                     <div class="icon-box bg-light text-dark"><i class="fas fa-arrow-up"></i></div>
@@ -72,7 +72,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3 col-6">
+        <div class="col-md-2 col-6">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body d-flex align-items-center gap-3">
                     <div class="icon-box bg-light text-dark"><i class="fas fa-chart-line"></i></div>
@@ -83,7 +83,29 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3 col-6">
+        <div class="col-md-2 col-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <div class="icon-box bg-success text-white"><i class="fas fa-rocket"></i></div>
+                    <div>
+                        <div class="fw-bold fs-4 text-success">{{ table|selectattr("portfolio_impact", "equalto", "large")|list|length }}</div>
+                        <div class="text-muted small">High Impact</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <div class="icon-box bg-warning text-white"><i class="fas fa-chart-bar"></i></div>
+                    <div>
+                        <div class="fw-bold fs-4 text-warning">{{ table|selectattr("portfolio_impact", "equalto", "mid")|list|length }}</div>
+                        <div class="text-muted small">Medium Impact</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body d-flex align-items-center gap-3">
                     <div class="icon-box bg-light text-dark"><i class="fas fa-exclamation-triangle"></i></div>
@@ -112,6 +134,7 @@
                                     <th>Price</th>
                                     <th>Quantity</th>
                                     <th>Total Value</th>
+                                    <th>Portfolio Impact</th>
                                     <th>Day's Gain %</th>
                                     <th>Overall Gain %</th>
                                     <th>Change</th>
@@ -135,6 +158,12 @@
                                     <td class="stock-price" data-symbol="{{ row.symbol }}">${{ "%.2f"|format(row.price) }}</td>
                                     <td>{{ row.quantity }}</td>
                                     <td>${{ "%.2f"|format(row.total_value) }}</td>
+                                    <td>
+                                        <span class="badge portfolio-impact-tooltip {% if row.portfolio_impact == 'large' %}bg-success{% elif row.portfolio_impact == 'mid' %}bg-warning{% else %}bg-secondary{% endif %}" 
+                                              data-tooltip="{% if row.portfolio_impact == 'large' %}High impact: Large quantity and/or strong performance{% elif row.portfolio_impact == 'mid' %}Medium impact: Moderate quantity and performance{% else %}Low impact: Small quantity or poor performance{% endif %}">
+                                            {{ row.portfolio_impact|title }}
+                                        </span>
+                                    </td>
                                     <td>{% if row.days_gain_pct is not none %}{{ "%.2f"|format(row.days_gain_pct) }}%{% else %}-{% endif %}</td>
                                     <td>{% if row.overall_gain_pct is not none %}{{ "%.2f"|format(row.overall_gain_pct) }}%{% else %}-{% endif %}</td>
                                     <td class="{% if row.change > 0 %}text-success{% elif row.change < 0 %}text-danger{% endif %}">
@@ -1146,6 +1175,53 @@
 
 .news-card:last-child {
     border-bottom: none !important;
+}
+
+/* Portfolio Impact Badges */
+.badge.bg-success {
+    background: linear-gradient(135deg, #28a745, #20c997) !important;
+    color: white;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge.bg-warning {
+    background: linear-gradient(135deg, #ffc107, #fd7e14) !important;
+    color: white;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge.bg-secondary {
+    background: linear-gradient(135deg, #6c757d, #495057) !important;
+    color: white;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Portfolio Impact Tooltip */
+.portfolio-impact-tooltip {
+    position: relative;
+    cursor: help;
+}
+
+.portfolio-impact-tooltip:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 1000;
+    margin-bottom: 5px;
 }
 </style>
 

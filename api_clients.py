@@ -76,17 +76,47 @@ def fetch_price(symbol):
         _set_cached_data(cache_key, result)
         return result
 
-def analyze_sentiment(text):
+def analyze_sentiment(text, price_change=None, price_change_percent=None):
+    """
+    Enhanced sentiment analysis that considers both text content and price changes
+    """
     text = text.lower()
-    negative_words = ["drop", "falls", "disappoint", "decline", "regulatory", "controversy", "loss", "plunge", "cut"]
-    positive_words = ["surge", "beats", "growth", "rise", "positive", "profit", "record", "strong"]
+    negative_words = ["drop", "falls", "disappoint", "decline", "regulatory", "controversy", "loss", "plunge", "cut", "down", "lower", "weak", "bearish", "crash", "sell", "negative"]
+    positive_words = ["surge", "beats", "growth", "rise", "positive", "profit", "record", "strong", "up", "higher", "bullish", "rally", "gain", "buy", "positive"]
+    
+    # Check text sentiment
+    text_sentiment = "neutral"
     for word in negative_words:
         if word in text:
-            return "negative"
+            text_sentiment = "negative"
+            break
     for word in positive_words:
         if word in text:
-            return "positive"
-    return "neutral"
+            text_sentiment = "positive"
+            break
+    
+    # If we have price change data, incorporate it into sentiment
+    if price_change is not None:
+        if price_change > 0:
+            if text_sentiment == "neutral":
+                text_sentiment = "positive"
+            elif text_sentiment == "negative":
+                text_sentiment = "neutral"  # Price gain might offset negative news
+        elif price_change < 0:
+            if text_sentiment == "neutral":
+                text_sentiment = "negative"
+            elif text_sentiment == "positive":
+                text_sentiment = "neutral"  # Price loss might offset positive news
+    
+    # Consider percentage change for stronger sentiment
+    if price_change_percent is not None:
+        if abs(price_change_percent) > 5:  # Significant move
+            if price_change_percent > 5:
+                text_sentiment = "positive"
+            elif price_change_percent < -5:
+                text_sentiment = "negative"
+    
+    return text_sentiment
 
 @lru_cache(maxsize=50)
 def fetch_news(symbol, limit=5):
@@ -103,7 +133,17 @@ def fetch_news(symbol, limit=5):
         data = response.json()
         news_items = []
         for item in data[:limit]:
-            sentiment = analyze_sentiment(item.get("headline", "") + " " + item.get("summary", ""))
+            # Get current price and change for enhanced sentiment analysis
+            current_price = fetch_price(symbol)
+            previous_close = fetch_previous_close(symbol)
+            change = current_price - previous_close if current_price and previous_close else 0
+            days_gain_pct = ((current_price - previous_close) / previous_close) * 100 if current_price and previous_close else None
+            
+            sentiment = analyze_sentiment(
+                item.get("headline", "") + " " + item.get("summary", ""),
+                price_change=change,
+                price_change_percent=days_gain_pct
+            )
             news_items.append({
                 "title": item.get("headline"),
                 "description": item.get("summary"),
