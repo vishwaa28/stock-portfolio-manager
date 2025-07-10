@@ -44,7 +44,7 @@
     
     #newsGrid {
         scrollbar-width: thin;
-        scrollbar-color: #dee2e6 #f8f9fa;
+        scrollbar-color: #000000 #f8f9fa;
     }
     
     #newsGrid::-webkit-scrollbar {
@@ -57,12 +57,12 @@
     }
     
     #newsGrid::-webkit-scrollbar-thumb {
-        background: #dee2e6;
+        background: #000000;
         border-radius: 3px;
     }
     
     #newsGrid::-webkit-scrollbar-thumb:hover {
-        background: #adb5bd;
+        background: #333333;
     }
     
     .badge {
@@ -178,6 +178,35 @@ let chartInstance;
 let selectedRow = null;
 let stockSectors = new Set();
 
+// Function to format market cap with 2 decimal places
+function formatMarketCap(marketCap) {
+    if (marketCap === null || marketCap === undefined || marketCap === 'N/A') {
+        return 'N/A';
+    }
+    
+    const num = parseFloat(marketCap);
+    if (isNaN(num)) {
+        return 'N/A';
+    }
+    
+    // Convert to billions if >= 1 billion
+    if (num >= 1000000000) {
+        return `$${(num / 1000000000).toFixed(2)}B`;
+    }
+    // Convert to millions if >= 1 million
+    else if (num >= 1000000) {
+        return `$${(num / 1000000).toFixed(2)}M`;
+    }
+    // Convert to thousands if >= 1 thousand
+    else if (num >= 1000) {
+        return `$${(num / 1000).toFixed(2)}K`;
+    }
+    // Otherwise just format with 2 decimal places
+    else {
+        return `$${num.toFixed(2)}`;
+    }
+}
+
 function updateChart(symbol) {
     fetch(`/api/stock_history/${symbol}`)
         .then(res => res.json())
@@ -242,7 +271,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td class="stock-price" data-symbol="${stock.symbol}">$${stock.price !== null ? stock.price.toFixed(2) : 'N/A'}</td>
                     <td class="${stock.change > 0 ? 'text-success' : stock.change < 0 ? 'text-danger' : ''}">${stock.change !== null ? stock.change.toFixed(2) : 'N/A'}</td>
                     <td>${stock.sector}</td>
-                    <td>${stock.market_cap !== null && stock.market_cap !== undefined ? stock.market_cap : 'N/A'}</td>
+                    <td>${formatMarketCap(stock.market_cap)}</td>
                 `;
                 tbody.appendChild(tr);
             });
